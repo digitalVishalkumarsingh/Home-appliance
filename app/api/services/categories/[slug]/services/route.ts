@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { staticServices } from "@/app/lib/services";
+import { services as staticServices } from "@/app/lib/services";
 
 // Get services for a specific category
 export async function GET(

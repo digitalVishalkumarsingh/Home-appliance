@@ -42,7 +42,7 @@ const BookingPrintButton: React.FC<{ booking: Booking }> = ({ booking }) => {
   }, []);
 
   const handlePrint = useReactToPrint({
-    // @ts-ignore - content is a valid prop but TypeScript definition might be outdated
+    // @ts-expect-error - content is a valid prop but TypeScript definition might be outdated
     content: () => componentRef.current,
     documentTitle: `Booking_${booking.bookingId || booking._id}`,
     onBeforeGetContent: () => {

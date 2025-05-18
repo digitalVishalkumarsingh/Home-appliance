@@ -28,7 +28,7 @@ const Pagination: React.FC<PaginationProps> = ({
     // Calculate range of page numbers to show
     const halfButtons = Math.floor(maxPageButtons / 2);
     let startPage = Math.max(1, currentPage - halfButtons);
-    let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+    const endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
 
     // Adjust if we're near the end
     if (endPage - startPage + 1 < maxPageButtons) {

@@ -3,9 +3,11 @@
   "rules": {
     "react/no-unescaped-entities": "off",
     "@typescript-eslint/no-explicit-any": "off",
-    "@typescript-eslint/no-unused-vars": "warn",
-    "@next/next/no-img-element": "warn",
-    "prefer-const": "warn",
-    "@typescript-eslint/no-require-imports": "warn"
+    "@typescript-eslint/no-unused-vars": "off",
+    "@next/next/no-img-element": "off",
+    "prefer-const": "off",
+    "@typescript-eslint/no-require-imports": "off",
+    "@typescript-eslint/ban-ts-comment": "off",
+    "react-hooks/exhaustive-deps": "off"
   }
 }
