@@ -6,7 +6,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   FaCalendarAlt,
-  FaClock,
   FaMoneyBillWave,
   FaCheckCircle,
   FaTimesCircle,

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { FaPrint, FaMapMarkerAlt, FaPhone, FaEnvelope, FaCalendarAlt, FaClock } from 'react-icons/fa';
+import { FaPrint } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 
 interface Booking {
@@ -82,7 +82,7 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
         return `${booking.firstName || ''} ${booking.lastName || ''}`.trim();
       }
       return "N/A";
-    } catch (error) {
+    } catch (_) {
       return "N/A";
     }
   };
@@ -90,7 +90,7 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
   const getCustomerEmail = () => {
     try {
       return booking?.customerEmail || booking?.email || booking?.notes?.email || "N/A";
-    } catch (error) {
+    } catch (_) {
       return "N/A";
     }
   };
@@ -98,7 +98,7 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
   const getCustomerPhone = () => {
     try {
       return booking?.customerPhone || booking?.phone || booking?.notes?.phone || "N/A";
-    } catch (error) {
+    } catch (_) {
       return "N/A";
     }
   };
@@ -106,7 +106,7 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
   const getCustomerAddress = () => {
     try {
       return booking?.address || booking?.customerAddress || booking?.notes?.customerAddress || "N/A";
-    } catch (error) {
+    } catch (_) {
       return "N/A";
     }
   };
@@ -114,7 +114,7 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
   const handlePrint = () => {
     try {
       setIsPrinting(true);
-      
+
       // Create a new window
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
@@ -122,7 +122,7 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
         setIsPrinting(false);
         return;
       }
-      
+
       // Write the HTML content
       printWindow.document.write(`
         <!DOCTYPE html>
@@ -323,9 +323,9 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
         </body>
         </html>
       `);
-      
+
       printWindow.document.close();
-      
+
       // Add event listener for when the print dialog is closed
       printWindow.onafterprint = () => {
         setTimeout(() => {
@@ -333,7 +333,7 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
           setIsPrinting(false);
         }, 500);
       };
-      
+
       // Trigger print after a short delay to ensure content is loaded
       setTimeout(() => {
         try {
@@ -345,7 +345,7 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
         }
         setIsPrinting(false);
       }, 500);
-      
+
     } catch (error) {
       console.error("Error opening print window:", error);
       toast.error("Failed to prepare print view. Please try again.");

@@ -1,5 +1,5 @@
-// Use require for Razorpay to avoid ESM issues
-const Razorpay = require('razorpay');
+// Import Razorpay
+import Razorpay from 'razorpay';
 
 // Initialize Razorpay with the API keys from environment variables
 const keyId = process.env.RAZORPAY_KEY_ID;

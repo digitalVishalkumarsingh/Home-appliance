@@ -1,7 +1,6 @@
 "use client";
 
 import { FaChevronLeft, FaChevronRight, FaAngleDoubleLeft, FaAngleDoubleRight } from "react-icons/fa";
-import { motion } from "framer-motion";
 
 interface PaginationProps {
   currentPage: number;

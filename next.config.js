@@ -24,11 +24,13 @@ const nextConfig = {
 
   // Configure serverless functions
   experimental: {
-    serverComponentsExternalPackages: ['mongodb'],
     serverActions: {
       bodySizeLimit: '2mb',
     },
   },
+
+  // External packages for server components
+  serverExternalPackages: ['mongodb'],
 
   // Handle trailing slashes consistently
   trailingSlash: false,

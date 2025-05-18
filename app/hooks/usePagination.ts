@@ -37,7 +37,7 @@ export function usePagination({
   const paginationMetadata = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = Math.min(startIndex + pageSize - 1, totalItems - 1);
-    
+
     return {
       currentPage,
       pageSize,
@@ -63,7 +63,7 @@ export function usePagination({
     // Calculate range of page numbers to show
     const halfButtons = Math.floor(maxPageButtons / 2);
     let startPage = Math.max(1, currentPage - halfButtons);
-    let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+    const endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
 
     // Adjust if we're near the end
     if (endPage - startPage + 1 < maxPageButtons) {
@@ -110,10 +110,10 @@ export function usePagination({
     (newPageSize: number) => {
       // Calculate the first item index of the current page
       const firstItemIndex = (currentPage - 1) * pageSize;
-      
+
       // Calculate what page this item would be on with the new page size
       const newPage = Math.floor(firstItemIndex / newPageSize) + 1;
-      
+
       setPageSize(newPageSize);
       setCurrentPage(newPage);
     },
