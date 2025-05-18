@@ -22,6 +22,14 @@ const nextConfig = {
     maxDuration: 60, // 60 seconds
   },
 
+  // Configure serverless functions
+  experimental: {
+    serverComponentsExternalPackages: ['mongodb'],
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
+
   // Handle trailing slashes consistently
   trailingSlash: false,
 
