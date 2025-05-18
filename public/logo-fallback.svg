@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="180" height="48" viewBox="0 0 180 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="180" height="48" rx="6" fill="#4F46E5"/>
+  <path d="M15 15 H35 V18 H18 V22 H32 V25 H18 V32 H15 V15 Z" fill="white"/>
+  <path d="M40 15 H60 V18 H43 V22 H57 V25 H43 V29 H60 V32 H40 V15 Z" fill="white"/>
+  <path d="M65 15 H68 V29 H85 V32 H65 V15 Z" fill="white"/>
+  <path d="M90 15 H93 V32 H90 V15 Z" fill="white"/>
+  <path d="M100 15 H120 V18 H103 V22 H117 V25 H103 V32 H100 V15 Z" fill="white"/>
+  <path d="M125 15 H145 V18 H128 V32 H125 V15 Z" fill="white"/>
+  <path d="M150 15 H170 V32 H167 V18 H153 V32 H150 V15 Z" fill="white"/>
+</svg>
