@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { FaCalendarAlt, FaClock, FaMapMarkerAlt, FaRupeeSign, FaSpinner, FaSearch, FaEye, FaPrint } from 'react-icons/fa';
@@ -61,9 +60,10 @@ export default function UserBookingsPage() {
     }
 
     fetchBookings();
-  }, [router]);
+    // We only want this to run once on component mount and when router changes
+  }, [router, fetchBookings]);
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
@@ -92,7 +92,7 @@ export default function UserBookingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';

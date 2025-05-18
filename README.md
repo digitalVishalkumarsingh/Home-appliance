@@ -1,4 +1,6 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dizit Solutions
+
+This is a Next.js project for Dizit Solutions, a home appliance service provider.
 
 ## Getting Started
 
@@ -16,22 +18,81 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a `.env.local` file in the root directory with the following variables:
 
-## Learn More
+```
+# MongoDB Connection
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database
+MONGODB_DB=Dizitsolution
 
-To learn more about Next.js, take a look at the following resources:
+# JWT Authentication
+JWT_SECRET=your-jwt-secret-key-at-least-32-characters
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Email Configuration
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-email-app-password
+ADMIN_EMAIL=admin@example.com
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Payment Gateway - Razorpay
+RAZORPAY_KEY_ID=your-razorpay-key-id
+RAZORPAY_KEY_SECRET=your-razorpay-key-secret
+RAZORPAY_WEBHOOK_SECRET=your-razorpay-webhook-secret
+
+# Payment Gateway - Stripe
+STRIPE_SECRET_KEY=your-stripe-secret-key
+
+# Admin Authentication
+ADMIN_AUTH_SECRET=your-admin-secret-key
+ADMIN_SECRET_KEY=your-admin-secret-key
+
+# Cron Jobs
+CRON_API_KEY=your-cron-api-key
+
+# Public Environment Variables (accessible in browser)
+NEXT_PUBLIC_WHATSAPP_NUMBER=9112564731
+NEXT_PUBLIC_CALL_NUMBER=9112564731
+NEXT_PUBLIC_PHONE=9112564731
+```
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Prerequisites
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-"# Dizit-solution" 
+1. Create a Vercel account at [vercel.com](https://vercel.com)
+2. Install the Vercel CLI: `npm i -g vercel`
+
+### Deployment Steps
+
+1. **Set up environment variables in Vercel**:
+   - Go to your project settings in the Vercel dashboard
+   - Add all the environment variables from `.env.local`
+
+2. **Deploy using Vercel CLI**:
+   ```bash
+   vercel
+   ```
+
+3. **Or deploy using GitHub integration**:
+   - Connect your GitHub repository to Vercel
+   - Configure the build settings
+   - Deploy
+
+### Troubleshooting Vercel Deployment
+
+If you encounter issues with Vercel deployment:
+
+1. **API Routes**: Make sure the `functions` pattern in `vercel.json` matches your actual API routes structure.
+2. **Environment Variables**: Verify all required environment variables are set in Vercel.
+3. **Build Errors**: Check the build logs for specific errors.
+4. **Serverless Function Size**: If functions are too large, optimize imports or split into smaller functions.
+
+## Features
+
+- User authentication (login/signup)
+- Admin dashboard
+- Booking and payment functionality
+- Service management
+- Customer management
+- Special offers and discounts

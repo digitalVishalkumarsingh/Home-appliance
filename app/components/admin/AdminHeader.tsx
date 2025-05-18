@@ -33,9 +33,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ userName = 'Admin' }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
 
-    // Clear cookies
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
-
     // Redirect to admin login page
     router.push('/admin/login');
   };

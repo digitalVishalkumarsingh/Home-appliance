@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
+import Link from "next/link";
 
 export default function AdminDebug() {
   const [authData, setAuthData] = useState<any>(null);
@@ -12,7 +13,7 @@ export default function AdminDebug() {
     try {
       const token = localStorage.getItem("token");
       const userStr = localStorage.getItem("user");
-      
+
       if (token && userStr) {
         try {
           const user = JSON.parse(userStr);
@@ -65,7 +66,7 @@ export default function AdminDebug() {
 
       // Show success message
       toast.success("Mock admin created successfully!");
-      
+
       // Refresh the page to update the displayed data
       window.location.reload();
     } catch (error) {
@@ -79,7 +80,7 @@ export default function AdminDebug() {
       localStorage.removeItem('user');
       localStorage.removeItem('freshAdminLogin');
       toast.success("Authentication data cleared!");
-      
+
       // Refresh the page to update the displayed data
       window.location.reload();
     } catch (error) {
@@ -92,7 +93,7 @@ export default function AdminDebug() {
       <div className="max-w-3xl mx-auto">
         <div className="bg-white shadow-md rounded-lg p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Authentication Debug</h1>
-          
+
           {isLoading ? (
             <div className="flex justify-center">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -105,7 +106,7 @@ export default function AdminDebug() {
                   {JSON.stringify(authData, null, 2)}
                 </pre>
               </div>
-              
+
               <div className="flex space-x-4">
                 <button
                   onClick={handleCreateMockAdmin}
@@ -113,7 +114,7 @@ export default function AdminDebug() {
                 >
                   Create Mock Admin
                 </button>
-                
+
                 <button
                   onClick={handleClearAuth}
                   className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -121,28 +122,28 @@ export default function AdminDebug() {
                   Clear Auth Data
                 </button>
               </div>
-              
+
               <div className="pt-4 border-t border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-800 mb-2">Navigation</h2>
                 <div className="flex flex-wrap gap-4">
-                  <a 
-                    href="/admin/login" 
+                  <Link
+                    href="/admin/login"
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
                     Admin Login
-                  </a>
-                  <a 
-                    href="/admin/dashboard" 
+                  </Link>
+                  <Link
+                    href="/admin/dashboard"
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
                     Admin Dashboard
-                  </a>
-                  <a 
-                    href="/" 
+                  </Link>
+                  <Link
+                    href="/"
                     className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
                   >
                     Home Page
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>

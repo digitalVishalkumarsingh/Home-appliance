@@ -4,11 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   FaSearch,
-  FaFilter,
   FaCalendarAlt,
   FaEye,
-  FaCheck,
-  FaTimes,
   FaArrowLeft,
   FaDownload,
   FaPrint,

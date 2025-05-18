@@ -17,11 +17,6 @@ const nextConfig = {
   // Disable React StrictMode in production to avoid double-rendering issues
   reactStrictMode: process.env.NODE_ENV !== 'production',
 
-  // Increase serverless function timeout for Vercel
-  serverRuntimeConfig: {
-    maxDuration: 60, // 60 seconds
-  },
-
   // Configure serverless functions
   experimental: {
     serverActions: {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaBell, FaCalendarCheck, FaRupeeSign, FaTimes, FaSpinner, FaStar, FaRegStar, FaExclamationCircle, FaSearch, FaFilter } from 'react-icons/fa';
+import { FaBell, FaCalendarCheck, FaRupeeSign, FaTimes, FaSpinner, FaStar, FaRegStar, FaExclamationCircle, FaSearch, FaFilter, FaCheck } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -38,20 +38,20 @@ export default function AdminNotificationsPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         router.push('/admin/login');
         return;
       }
 
       let url = `/api/admin/notifications?page=${page}&limit=20`;
-      
+
       if (filter === 'unread') {
         url += '&unreadOnly=true';
       } else if (filter === 'important') {
         url += '&importantOnly=true';
       }
-      
+
       if (searchTerm) {
         url += `&search=${encodeURIComponent(searchTerm)}`;
       }
@@ -67,7 +67,7 @@ export default function AdminNotificationsPage() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setNotifications(data.notifications || []);
         setTotalPages(data.pagination?.pages || 1);
@@ -93,7 +93,7 @@ export default function AdminNotificationsPage() {
     try {
       setProcessingIds(prev => [...prev, notificationId]);
       const token = localStorage.getItem('token');
-      
+
       if (!token) return;
 
       const response = await fetch(`/api/admin/notifications/${notificationId}/read`, {
@@ -116,7 +116,7 @@ export default function AdminNotificationsPage() {
             : notification
         )
       );
-      
+
       toast.success('Notification marked as read');
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -130,7 +130,7 @@ export default function AdminNotificationsPage() {
     try {
       setProcessingIds(prev => [...prev, notificationId]);
       const token = localStorage.getItem('token');
-      
+
       if (!token) return;
 
       const response = await fetch(`/api/admin/notifications/${notificationId}/important`, {
@@ -146,7 +146,7 @@ export default function AdminNotificationsPage() {
       }
 
       const data = await response.json();
-      
+
       // Update local state
       setNotifications(
         notifications.map((notification) =>
@@ -155,7 +155,7 @@ export default function AdminNotificationsPage() {
             : notification
         )
       );
-      
+
       toast.success(data.message);
     } catch (error) {
       console.error('Error toggling notification importance:', error);
@@ -169,7 +169,7 @@ export default function AdminNotificationsPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
+
       if (!token) return;
 
       const response = await fetch('/api/admin/notifications/read', {
@@ -193,7 +193,7 @@ export default function AdminNotificationsPage() {
           readAt: new Date().toISOString(),
         }))
       );
-      
+
       toast.success('All notifications marked as read');
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
@@ -231,7 +231,7 @@ export default function AdminNotificationsPage() {
     if (!notification.isRead) {
       markAsRead(notification._id);
     }
-    
+
     // Navigate to appropriate page based on notification type
     if (notification.referenceId) {
       if (notification.type === 'booking' || notification.type === 'payment' || notification.type === 'cancellation') {
@@ -373,7 +373,7 @@ export default function AdminNotificationsPage() {
                     <div className="flex-shrink-0 mr-3 mt-1">
                       {getNotificationIcon(notification.type)}
                     </div>
-                    <div 
+                    <div
                       className="flex-1 cursor-pointer"
                       onClick={() => handleNotificationClick(notification)}
                     >
