@@ -5,7 +5,7 @@ import { ObjectId } from "mongodb";
 // Get a specific service category by slug
 export async function GET(
   request: Request,
-  context: { params: { slug: string } }
+  context: { params: Promise<{ slug: string }> }
 ) {
   try {
     // Get params from context

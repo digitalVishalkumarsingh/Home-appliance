@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 // Get a specific notification
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify user authentication
@@ -82,7 +82,7 @@ export async function GET(
 // Delete a notification
 export async function DELETE(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify user authentication

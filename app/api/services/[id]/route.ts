@@ -4,7 +4,7 @@ import { services as staticServices } from "@/app/lib/services";
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get params from context

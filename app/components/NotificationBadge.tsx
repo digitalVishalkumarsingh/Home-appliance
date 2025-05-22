@@ -45,6 +45,14 @@ export default function NotificationBadge() {
       });
 
       if (!response.ok) {
+        // Check if token expired
+        if (response.status === 401) {
+          // Token might be expired, but don't log out the user immediately
+          // Just clear notifications and let other components handle auth
+          setNotifications([]);
+          setUnreadCount(0);
+          return;
+        }
         throw new Error("Failed to fetch notifications");
       }
 
@@ -53,6 +61,9 @@ export default function NotificationBadge() {
       setUnreadCount(data.unreadCount || 0);
     } catch (error) {
       console.error("Error fetching notifications:", error);
+      // Don't show any error to the user, just clear notifications
+      setNotifications([]);
+      setUnreadCount(0);
     } finally {
       setLoading(false);
     }

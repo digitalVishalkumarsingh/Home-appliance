@@ -4,7 +4,7 @@ import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
 
 // Helper function to handle both PATCH and PUT requests
-async function updatePaymentStatus(request: Request, context: { params: { id: string } }) {
+async function updatePaymentStatus(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     // Verify admin authentication
     const token = getTokenFromRequest(request);
@@ -26,7 +26,7 @@ async function updatePaymentStatus(request: Request, context: { params: { id: st
     }
 
     // Get params from context
-    const params = context.params;
+    const params = await context.params;
     const bookingId = params.id;
 
     // Get status from request body
@@ -75,11 +75,11 @@ async function updatePaymentStatus(request: Request, context: { params: { id: st
     // Update booking payment status
     const updateResult = await db.collection("bookings").updateOne(
       booking._id ? { _id: booking._id } : { bookingId },
-      { 
-        $set: { 
+      {
+        $set: {
           paymentStatus,
           updatedAt: new Date().toISOString()
-        } 
+        }
       }
     );
 
@@ -97,32 +97,32 @@ async function updatePaymentStatus(request: Request, context: { params: { id: st
 
     if (payment) {
       // Map booking payment status to payment status
-      const paymentRecordStatus = 
+      const paymentRecordStatus =
         paymentStatus === "paid" ? "completed" :
         paymentStatus === "failed" ? "failed" :
         paymentStatus === "refunded" ? "refunded" : "pending";
 
       await db.collection("payments").updateOne(
         { _id: payment._id },
-        { 
-          $set: { 
+        {
+          $set: {
             status: paymentRecordStatus,
             updatedAt: new Date().toISOString(),
             updatedBy: (decoded as {userId?: string}).userId || "admin",
             manuallyUpdated: true
-          } 
+          }
         }
       );
     }
 
     // Create notification for the customer
     try {
-      const notificationTitle = 
+      const notificationTitle =
         paymentStatus === "paid" ? "Payment Confirmed" :
         paymentStatus === "refunded" ? "Payment Refunded" :
         paymentStatus === "failed" ? "Payment Failed" : "Payment Status Updated";
-      
-      const notificationMessage = 
+
+      const notificationMessage =
         paymentStatus === "paid" ? `Your payment for booking ${booking.bookingId || booking._id} has been confirmed.` :
         paymentStatus === "refunded" ? `Your payment for booking ${booking.bookingId || booking._id} has been refunded.` :
         paymentStatus === "failed" ? `Your payment for booking ${booking.bookingId || booking._id} has failed.` :
@@ -168,10 +168,10 @@ async function updatePaymentStatus(request: Request, context: { params: { id: st
 }
 
 // Export PATCH and PUT methods that use the helper function
-export async function PATCH(request: Request, context: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   return updatePaymentStatus(request, context);
 }
 
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   return updatePaymentStatus(request, context);
 }

@@ -52,20 +52,16 @@ export default function UserBookingsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login?redirect=/bookings');
-      return;
-    }
-
-    fetchBookings();
-    // We only want this to run once on component mount and when router changes
-  }, [router, fetchBookings]);
-
-  const fetchBookings = useCallback(async () => {
+  // Define fetchBookings without useCallback to avoid circular dependencies
+  const fetchBookings = async () => {
     try {
       setLoading(true);
+
+      // Safely access localStorage only in browser environment
+      if (typeof window === 'undefined') {
+        return; // Exit early if running on server
+      }
+
       const token = localStorage.getItem('token');
 
       if (!token) {
@@ -92,6 +88,21 @@ export default function UserBookingsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Effect to fetch bookings on component mount
+  useEffect(() => {
+    // Safely access localStorage only in browser environment
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login?redirect=/bookings');
+        return;
+      }
+
+      fetchBookings();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const formatDate = (dateString?: string) => {

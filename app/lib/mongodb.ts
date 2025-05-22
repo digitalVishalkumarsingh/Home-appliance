@@ -1,129 +1,22 @@
-import { MongoClient, ObjectId, Db, Collection } from "mongodb";
+import { MongoClient, ObjectId, Db } from "mongodb";
 
-// Environment variable validation
+// Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB = process.env.MONGODB_DB || "Dizitsolution";
 
-// Only throw an error in development mode
+// Check if MongoDB URI is set
 if (!MONGODB_URI) {
-  if (process.env.NODE_ENV === 'development') {
-    throw new Error("MONGODB_URI environment variable is not set");
-  } else {
-    console.error("MONGODB_URI environment variable is not set");
-  }
-}
-
-// Constants
-const COLLECTION_USERS = "users";
-const COLLECTION_BOOKINGS = "bookings";
-
-// Interfaces for MockDb
-interface MockDocument {
-  _id: ObjectId;
-  [key: string]: any;
-}
-
-interface MockCollection {
-  findOne(query: Partial<MockDocument>): Promise<MockDocument | null>;
-  insertOne(doc: MockDocument): Promise<{ insertedId: ObjectId }>;
-  countDocuments(query: Partial<MockDocument>): Promise<number>;
-  updateOne(query: Partial<MockDocument>, update: { $set?: Partial<MockDocument> }): Promise<{ modifiedCount: number }>;
-  find(query: Partial<MockDocument>): {
-    sort(sortQuery: { [key: string]: 1 | -1 }): any;
-    limit(n: number): any;
-    toArray(): Promise<MockDocument[]>;
-  };
-}
-
-// Mock database for testing
-class MockDb {
-  private collections: Record<string, MockDocument[]> = {
-    [COLLECTION_USERS]: [],
-    [COLLECTION_BOOKINGS]: [],
-  };
-
-  collection(name: string): MockCollection {
-    if (!this.collections[name]) {
-      this.collections[name] = [];
-    }
-
-    return {
-      findOne: async (query: Partial<MockDocument>) => {
-        const items = this.collections[name];
-        return (
-          items.find((item) =>
-            Object.entries(query).every(([key, value]) =>
-              key === "_id" ? item._id.toString() === value.toString() : item[key] === value
-            )
-          ) || null
-        );
-      },
-
-      insertOne: async (doc: MockDocument) => {
-        const id = new ObjectId();
-        const newDoc = { ...doc, _id: id };
-        this.collections[name].push(newDoc);
-        return { insertedId: id };
-      },
-
-      countDocuments: async (query: Partial<MockDocument>) => {
-        const items = this.collections[name];
-        return items.filter((item) =>
-          Object.entries(query).every(([key, value]) => item[key] === value)
-        ).length;
-      },
-
-      updateOne: async (query: Partial<MockDocument>, update: { $set?: Partial<MockDocument> }) => {
-        const items = this.collections[name];
-        let modifiedCount = 0;
-
-        const index = items.findIndex((item) =>
-          Object.entries(query).every(([key, value]) =>
-            key === "_id" ? item._id.toString() === value.toString() : item[key] === value
-          )
-        );
-
-        if (index !== -1 && update.$set) {
-          items[index] = { ...items[index], ...update.$set };
-          modifiedCount = 1;
-        }
-
-        return { modifiedCount };
-      },
-
-      find: (query: Partial<MockDocument>) => {
-        const items = this.collections[name];
-        let filteredItems = items.filter((item) =>
-          Object.entries(query).every(([key, value]) => item[key] === value)
-        );
-
-        const cursor = {
-          sort: (sortQuery: { [key: string]: 1 | -1 }) => {
-            const [key, order] = Object.entries(sortQuery)[0];
-            filteredItems.sort((a, b) => {
-              const aValue = key === "_id" ? a._id.toString() : a[key];
-              const bValue = key === "_id" ? b._id.toString() : b[key];
-              return order === 1 ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
-            });
-            return cursor;
-          },
-          limit: (n: number) => {
-            filteredItems = filteredItems.slice(0, n);
-            return cursor;
-          },
-          toArray: async () => filteredItems,
-        };
-
-        return cursor;
-      },
-    };
-  }
+  console.warn("MONGODB_URI environment variable is not set");
 }
 
 // Global variables to cache the MongoDB connection
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
 
+/**
+ * Connect to MongoDB database
+ * @returns Promise with MongoDB client and database
+ */
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
   try {
     // Use cached connection if available
@@ -131,23 +24,21 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
       return { client: cachedClient, db: cachedDb };
     }
 
-    // If MONGODB_URI is not set, use mock database in production
+    // Connect to MongoDB
     if (!MONGODB_URI) {
-      console.warn("Using mock database because MONGODB_URI is not set");
-      const mockDb = new MockDb();
-      return {
-        client: null as unknown as MongoClient,
-        db: mockDb as unknown as Db
-      };
+      throw new Error("MONGODB_URI environment variable is not set");
     }
 
-    // Connect to MongoDB
-    const client = await MongoClient.connect(MONGODB_URI as string, {
-      maxPoolSize: 10, // Limit connection pool size
-      connectTimeoutMS: 10000, // 10 seconds
-      socketTimeoutMS: 45000, // 45 seconds
-      retryWrites: true, // Enable retryable writes
-      writeConcern: { w: "majority" }, // Ensure data durability
+    console.log("Connecting to MongoDB database...");
+
+    // Connect with more robust options for MongoDB Atlas
+    // Use simplified options to avoid SSL/TLS issues
+    const client = await MongoClient.connect(MONGODB_URI, {
+      maxPoolSize: 10,
+      connectTimeoutMS: 30000, // Increased timeout
+      socketTimeoutMS: 45000,
+      serverSelectionTimeoutMS: 30000, // Added server selection timeout
+      retryWrites: true,
     });
 
     const db = client.db(MONGODB_DB);
@@ -156,25 +47,28 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
     cachedClient = client;
     cachedDb = db;
 
+    console.log("Successfully connected to MongoDB database");
     return { client, db };
   } catch (error) {
-    console.error(`Failed to connect to database: ${error instanceof Error ? error.message : "Unknown error"}`);
+    // Log detailed error information
+    console.error("MongoDB Connection Error:");
+    console.error(`- Error Message: ${error instanceof Error ? error.message : "Unknown error"}`);
+    console.error(`- MongoDB URI: ${MONGODB_URI ? MONGODB_URI.substring(0, 20) + "..." : "Not set"}`);
+    console.error(`- MongoDB DB: ${MONGODB_DB}`);
 
-    // In production, use mock database as fallback
-    if (process.env.NODE_ENV === 'production') {
-      console.warn("Using mock database as fallback due to connection error");
-      const mockDb = new MockDb();
-      return {
-        client: null as unknown as MongoClient,
-        db: mockDb as unknown as Db
-      };
-    }
-
-    throw new Error(`Failed to connect to database: ${error instanceof Error ? error.message : "Unknown error"}`);
+    // Create a simple mock database for development
+    console.warn("Using mock database due to connection error");
+    const mockDb = createMockDb();
+    return {
+      client: null as unknown as MongoClient,
+      db: mockDb as unknown as Db
+    };
   }
 }
 
-// Graceful connection cleanup
+/**
+ * Close MongoDB connection
+ */
 export async function closeConnection(): Promise<void> {
   if (cachedClient) {
     await cachedClient.close();
@@ -183,6 +77,159 @@ export async function closeConnection(): Promise<void> {
   }
 }
 
-// Export MockDb for testing
-export { MockDb, ObjectId };
+/**
+ * Create a mock database with sample data for development
+ */
+function createMockDb() {
+  // Sample data for different collections
+  const mockData: Record<string, any[]> = {
+    users: [
+      {
+        _id: new ObjectId(),
+        name: "John Doe",
+        email: "john@example.com",
+        phone: "9876543210",
+        password: "hashedpassword",
+        role: "user",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        _id: new ObjectId(),
+        name: "Admin User",
+        email: "admin@example.com",
+        phone: "9876543211",
+        password: "hashedpassword",
+        role: "admin",
+        createdAt: new Date().toISOString(),
+      }
+    ],
+    bookings: [
+      {
+        _id: new ObjectId(),
+        bookingId: "BK1001",
+        userId: "user123",
+        customerName: "John Doe",
+        customerEmail: "john@example.com",
+        customerPhone: "9876543210",
+        serviceId: "service123",
+        serviceName: "AC Repair",
+        status: "completed",
+        amount: 1499,
+        paymentStatus: "paid",
+        scheduledDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      }
+    ],
+    services: [
+      {
+        _id: new ObjectId(),
+        title: "AC Repair",
+        description: "Professional AC repair service",
+        price: 1499,
+        discountedPrice: 1299,
+        category: "AC Services",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      }
+    ]
+  };
 
+  // Return mock database implementation
+  return {
+    collection: (collectionName: string) => {
+      // Get data for this collection (or empty array if not defined)
+      const collectionData = mockData[collectionName] || [];
+
+      return {
+        findOne: async (query = {}) => {
+          // Simple implementation to find one document
+          const item = collectionData.find(item => {
+            // Match all query criteria
+            return Object.entries(query || {}).every(([key, value]) => {
+              if (key === '_id' && typeof value === 'string') {
+                return item._id.toString() === value;
+              }
+              return item[key] === value;
+            });
+          });
+          return item || null;
+        },
+
+        find: (query = {}) => {
+          // Filter items based on query
+          let filteredItems = collectionData.filter(item => {
+            return Object.entries(query || {}).every(([key, value]) => {
+              if (key === '_id' && typeof value === 'string') {
+                return item._id.toString() === value;
+              }
+              return item[key] === value;
+            });
+          });
+
+          // Return cursor-like object
+          return {
+            sort: () => ({
+              limit: () => ({
+                skip: () => ({
+                  project: () => ({
+                    toArray: async () => filteredItems
+                  })
+                })
+              })
+            }),
+            toArray: async () => filteredItems
+          };
+        },
+
+        countDocuments: async (query = {}) => {
+          // Count documents matching query
+          return collectionData.filter(item => {
+            return Object.entries(query || {}).every(([key, value]) => item[key] === value);
+          }).length;
+        },
+
+        insertOne: async (doc: any) => {
+          const id = new ObjectId();
+          const newDoc = { ...doc, _id: id };
+          collectionData.push(newDoc);
+          return { insertedId: id };
+        },
+
+        updateOne: async (query: any, update: { $set?: any }) => {
+          let modifiedCount = 0;
+
+          // Find index of matching document
+          const index = collectionData.findIndex(item => {
+            return Object.entries(query || {}).every(([key, value]) => item[key] === value);
+          });
+
+          // Update document if found
+          if (index !== -1 && update.$set) {
+            collectionData[index] = { ...collectionData[index], ...update.$set };
+            modifiedCount = 1;
+          }
+
+          return { modifiedCount };
+        },
+
+        deleteOne: async (query: any) => {
+          const initialLength = collectionData.length;
+
+          // Find index of matching document
+          const index = collectionData.findIndex(item => {
+            return Object.entries(query || {}).every(([key, value]) => item[key] === value);
+          });
+
+          // Remove document if found
+          if (index !== -1) {
+            collectionData.splice(index, 1);
+          }
+
+          return { deletedCount: initialLength - collectionData.length };
+        }
+      };
+    }
+  };
+}
+
+export { ObjectId };

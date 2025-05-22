@@ -176,7 +176,7 @@ export async function POST(request: Request) {
       success: true,
       message: "Booking created successfully",
       booking: {
-        id: result.insertedId.toString(),
+        _id: result.insertedId.toString(),
         bookingId: bookingId,
         ...newBooking
       }
@@ -189,4 +189,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
 

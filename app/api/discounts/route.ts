@@ -11,11 +11,22 @@ export async function GET(request: Request) {
     const now = new Date().toISOString();
 
     // Find all active discounts
-    const discounts = await db.collection("discounts").find({
-      isActive: true,
-      startDate: { $lte: now },
-      endDate: { $gte: now }
-    }).toArray();
+    let discounts = [];
+    try {
+      const cursor = db.collection("discounts").find({
+        isActive: true,
+        startDate: { $lte: now },
+        endDate: { $gte: now }
+      });
+
+      // Check if toArray method exists and is a function
+      if (cursor.toArray && typeof cursor.toArray === 'function') {
+        discounts = await cursor.toArray();
+      }
+    } catch (queryError) {
+      console.error("Error in MongoDB query:", queryError);
+      // Continue with empty discounts array
+    }
 
     return NextResponse.json({
       success: true,

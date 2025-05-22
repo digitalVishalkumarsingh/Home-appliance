@@ -6,8 +6,8 @@ import { ObjectId } from "mongodb";
 // Get a specific service
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
   try {
     // Verify admin authentication
     const token = getTokenFromRequest(request);
@@ -29,8 +29,8 @@ export async function GET(
     }
 
     // Get service ID from params
-    const { id } = params;
-    
+    const { id } = await params;
+
     if (!id) {
       return NextResponse.json(
         { message: "Service ID is required" },
@@ -72,8 +72,8 @@ export async function GET(
 // Update a service
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
   try {
     // Verify admin authentication
     const token = getTokenFromRequest(request);
@@ -95,8 +95,8 @@ export async function PUT(
     }
 
     // Get service ID from params
-    const { id } = params;
-    
+    const { id } = await params;
+
     if (!id) {
       return NextResponse.json(
         { message: "Service ID is required" },
@@ -167,8 +167,8 @@ export async function PUT(
 // Delete a service
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
   try {
     // Verify admin authentication
     const token = getTokenFromRequest(request);
@@ -190,8 +190,8 @@ export async function DELETE(
     }
 
     // Get service ID from params
-    const { id } = params;
-    
+    const { id } = await params;
+
     if (!id) {
       return NextResponse.json(
         { message: "Service ID is required" },

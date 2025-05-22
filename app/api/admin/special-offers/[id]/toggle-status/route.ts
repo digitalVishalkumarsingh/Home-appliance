@@ -6,10 +6,10 @@ import { ObjectId } from "mongodb";
 // Toggle the active status of a special offer (admin only)
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
   try {
-    const id = params.id;
+    const id = (await params).id;
 
     // Verify admin authentication
     const token = getTokenFromRequest(request);
@@ -65,11 +65,11 @@ export async function PATCH(
     // Update the active status
     await db.collection("specialOffers").updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
+      {
+        $set: {
           isActive: isActive,
           updatedAt: new Date().toISOString()
-        } 
+        }
       }
     );
 

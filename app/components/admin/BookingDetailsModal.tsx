@@ -149,7 +149,13 @@ export default function BookingDetailsModal({ bookingId, onClose, onStatusChange
       await onStatusChange(booking.id, status as any);
 
       // Update the local booking state with the new status
-      setBooking(prev => prev ? { ...prev, status } : null);
+      setBooking(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          status: status as "pending" | "confirmed" | "completed" | "cancelled"
+        };
+      });
 
       // Show success message
       toast.success(`Booking ${status === "confirmed" ? "accepted" : status} successfully`);
@@ -178,12 +184,10 @@ export default function BookingDetailsModal({ bookingId, onClose, onStatusChange
     try {
       console.log("Printing booking:", booking);
 
-      // Create a new window
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast.error("Could not open print window. Please check your popup blocker settings.");
-        return;
-      }
+      // Create a print iframe instead of a new window
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
 
       // Format amount for display
       const formattedAmount = new Intl.NumberFormat('en-IN', {
@@ -193,8 +197,8 @@ export default function BookingDetailsModal({ bookingId, onClose, onStatusChange
         maximumFractionDigits: 0
       }).format(booking.amount);
 
-      // Write the HTML content
-      printWindow.document.write(`
+      // Create HTML content
+      const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -392,18 +396,36 @@ export default function BookingDetailsModal({ bookingId, onClose, onStatusChange
           </div>
         </body>
         </html>
-      `);
+      `;
 
-      printWindow.document.close();
+      // Write to the iframe
+      const iframeDocument = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDocument) {
+        throw new Error("Could not access iframe document");
+      }
 
-      // Trigger print after a short delay to ensure content is loaded
+      iframeDocument.open();
+      iframeDocument.write(htmlContent);
+      iframeDocument.close();
+
+      // Wait for the iframe to load
       setTimeout(() => {
         try {
-          printWindow.print();
+          // Print the iframe
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+
+          // Show success message
           toast.success("Booking details ready for printing");
+
+          // Clean up
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
         } catch (error) {
           console.error("Print error:", error);
           toast.error("Failed to print. Please try again.");
+          document.body.removeChild(iframe);
         }
       }, 500);
 

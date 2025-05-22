@@ -92,17 +92,39 @@ export async function GET(request: Request) {
     }
 
     // Find all active special offers matching the criteria
-    const specialOffers = await db.collection("specialOffers")
-      .find(query)
-      .sort({ createdAt: -1 })
-      .toArray();
+    let specialOffers = [];
+    try {
+      const cursor = db.collection("specialOffers").find(query);
+
+      // Check if sort method exists and is a function
+      if (cursor.sort && typeof cursor.sort === 'function') {
+        const sortedCursor = cursor.sort({ createdAt: -1 });
+
+        // Check if toArray method exists and is a function
+        if (sortedCursor.toArray && typeof sortedCursor.toArray === 'function') {
+          specialOffers = await sortedCursor.toArray();
+        }
+      }
+    } catch (queryError) {
+      console.error("Error in MongoDB query:", queryError);
+      // Continue with empty specialOffers array
+    }
 
     // If user is authenticated, check usage limits
     if (userId) {
       // Get usage data for this user
-      const offerUsage = await db.collection("specialOfferUsage")
-        .find({ userId: userId })
-        .toArray();
+      let offerUsage = [];
+      try {
+        const cursor = db.collection("specialOfferUsage").find({ userId: userId });
+
+        // Check if toArray method exists and is a function
+        if (cursor.toArray && typeof cursor.toArray === 'function') {
+          offerUsage = await cursor.toArray();
+        }
+      } catch (queryError) {
+        console.error("Error in MongoDB query for offer usage:", queryError);
+        // Continue with empty offerUsage array
+      }
 
       // Create a map of offer usage counts
       const usageCounts: Record<string, number> = {};

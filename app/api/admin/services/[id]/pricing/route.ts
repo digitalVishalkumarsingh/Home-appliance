@@ -6,8 +6,8 @@ import { ObjectId } from "mongodb";
 // Update service pricing
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
   try {
     // Verify admin authentication
     const token = getTokenFromRequest(request);
@@ -29,8 +29,8 @@ export async function PUT(
     }
 
     // Get service ID from params
-    const { id } = params;
-    
+    const { id } = await params;
+
     if (!id) {
       return NextResponse.json(
         { message: "Service ID is required" },
@@ -73,14 +73,14 @@ export async function PUT(
     // Format pricing data
     const formattedPricing = {
       basic: {
-        price: pricing.basic.price.startsWith("₹") 
-          ? pricing.basic.price 
+        price: pricing.basic.price.startsWith("₹")
+          ? pricing.basic.price
           : `₹${pricing.basic.price}`,
         description: pricing.basic.description
       },
       comprehensive: {
-        price: pricing.comprehensive.price.startsWith("₹") 
-          ? pricing.comprehensive.price 
+        price: pricing.comprehensive.price.startsWith("₹")
+          ? pricing.comprehensive.price
           : `₹${pricing.comprehensive.price}`,
         description: pricing.comprehensive.description
       }
@@ -89,11 +89,11 @@ export async function PUT(
     // Update service pricing
     const result = await db.collection("services").updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
+      {
+        $set: {
           pricing: formattedPricing,
           updatedAt: new Date()
-        } 
+        }
       }
     );
 

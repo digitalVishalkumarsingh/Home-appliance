@@ -6,7 +6,7 @@ import { services as staticServices } from "@/app/lib/services";
 // Get services for a specific category
 export async function GET(
   request: Request,
-  context: { params: { slug: string } }
+  context: { params: Promise<{ slug: string }> }
 ) {
   try {
     // Get params from context

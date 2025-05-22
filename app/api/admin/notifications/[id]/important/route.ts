@@ -1,16 +1,28 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
-import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
+import { verifyToken } from "@/app/lib/auth-edge";
 import { ObjectId } from "mongodb";
 
 // Toggle the importance of an admin notification
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Verify admin authentication
-    const token = getTokenFromRequest(request);
+    // Get token from cookies or authorization header
+    const cookieHeader = request.headers.get('Cookie');
+    let token = request.headers.get('authorization')?.split(' ')[1];
+
+    // If no token in authorization header, try to get from cookies
+    if (!token && cookieHeader) {
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
+
+      token = cookies.token;
+    }
 
     if (!token) {
       return NextResponse.json(
@@ -19,7 +31,7 @@ export async function PATCH(
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -29,7 +41,7 @@ export async function PATCH(
     }
 
     // Get params from context
-    const params = context.params;
+    const params = await context.params;
     const notificationId = params.id;
 
     // Validate notification ID

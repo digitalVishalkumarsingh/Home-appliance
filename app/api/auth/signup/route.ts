@@ -34,6 +34,19 @@ interface ApiResponse {
   userId?: string;
 }
 
+// Handle CORS preflight requests
+export async function OPTIONS(request: Request) {
+  const response = new NextResponse(null, { status: 204 }); // No content
+
+  // Set CORS headers
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  response.headers.set("Access-Control-Max-Age", "86400"); // 24 hours
+
+  return response;
+}
+
 export async function POST(request: Request) {
   try {
     // Parse and validate request body
@@ -103,6 +116,11 @@ export async function POST(request: Request) {
     response.headers.set("X-Content-Type-Options", "nosniff");
     response.headers.set("X-Frame-Options", "DENY");
     response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+
+    // Set CORS headers
+    response.headers.set("Access-Control-Allow-Origin", "*");
+    response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
     logger.info("User registered successfully", { userId: result.insertedId.toString(), email });
     return response;

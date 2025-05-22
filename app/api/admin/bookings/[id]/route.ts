@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 // Get a specific booking
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication
@@ -90,7 +90,7 @@ export async function GET(
 // Update a booking
 export async function PUT(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication
@@ -191,7 +191,7 @@ export async function PUT(
 // Delete a booking
 export async function DELETE(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication

@@ -1,13 +1,25 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
-import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
+import { verifyToken } from "@/app/lib/auth-edge";
 import { ObjectId } from "mongodb";
 
 // Get admin notifications
 export async function GET(request: Request) {
   try {
-    // Verify admin authentication
-    const token = getTokenFromRequest(request);
+    // Get token from cookies or authorization header
+    const cookieHeader = request.headers.get('Cookie');
+    let token = request.headers.get('authorization')?.split(' ')[1];
+
+    // If no token in authorization header, try to get from cookies
+    if (!token && cookieHeader) {
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
+
+      token = cookies.token;
+    }
 
     if (!token) {
       return NextResponse.json(
@@ -16,7 +28,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -97,8 +109,20 @@ export async function GET(request: Request) {
 // Create a new admin notification
 export async function POST(request: Request) {
   try {
-    // Verify admin authentication
-    const token = getTokenFromRequest(request);
+    // Get token from cookies or authorization header
+    const cookieHeader = request.headers.get('Cookie');
+    let token = request.headers.get('authorization')?.split(' ')[1];
+
+    // If no token in authorization header, try to get from cookies
+    if (!token && cookieHeader) {
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
+
+      token = cookies.token;
+    }
 
     if (!token) {
       return NextResponse.json(
@@ -107,7 +131,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(

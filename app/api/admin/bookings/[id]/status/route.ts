@@ -4,7 +4,7 @@ import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
 
 // Helper function to handle both PATCH and PUT requests
-async function updateBookingStatus(request: Request, context: { params: { id: string } }) {
+async function updateBookingStatus(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     // Verify admin authentication
     const token = getTokenFromRequest(request);
@@ -158,10 +158,10 @@ async function updateBookingStatus(request: Request, context: { params: { id: st
 }
 
 // Export PATCH and PUT methods that use the helper function
-export async function PATCH(request: Request, context: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   return updateBookingStatus(request, context);
 }
 
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   return updateBookingStatus(request, context);
 }

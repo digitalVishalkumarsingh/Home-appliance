@@ -24,10 +24,10 @@ interface SpecialOffer {
 // Get a specific special offer by ID (admin only)
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
   try {
-    const id = params.id;
+    const id = (await params).id;
 
     // Verify admin authentication
     const token = getTokenFromRequest(request);
@@ -85,10 +85,10 @@ export async function GET(
 // Update a special offer (admin only)
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
   try {
-    const id = params.id;
+    const id = (await params).id;
 
     // Verify admin authentication
     const token = getTokenFromRequest(request);
@@ -233,8 +233,8 @@ export async function PUT(
 // Delete a special offer (admin only)
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
   try {
     const id = params.id;
 

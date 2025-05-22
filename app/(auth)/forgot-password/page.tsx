@@ -51,6 +51,7 @@ export default function ForgotPasswordPage() {
         }
         data = await response.json();
       } catch (jsonError) {
+        // The logger now has built-in error handling
         logger.error("Failed to parse JSON response", { error: jsonError });
         throw new Error("Invalid response from server. Please try again.");
       }
@@ -71,6 +72,7 @@ export default function ForgotPasswordPage() {
         showConfirmButton: true,
       });
     } catch (err: any) {
+      // The logger now has built-in error handling
       logger.error("Forgot password error", { error: err.message });
       setError(err.message || "An error occurred. Please try again.");
     } finally {

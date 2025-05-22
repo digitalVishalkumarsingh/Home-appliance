@@ -6,13 +6,15 @@ const JWT_SECRET = process.env.JWT_SECRET || 'xtyfyyu-j77nn-secure-jwt-secret-ke
 
 // Generate a JWT token
 export function generateToken(payload: any) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
+  // Increase token expiration to 7 days for better user experience
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }
 
 // Verify a JWT token
 export function verifyToken(token: string) {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    // Use ignoreExpiration: false to ensure we check expiration properly
+    const decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: false });
 
     // If userId is a buffer object, convert it to a string
     if (decoded && typeof decoded === 'object' && 'userId' in decoded) {
@@ -33,7 +35,15 @@ export function verifyToken(token: string) {
 
     return decoded;
   } catch (error) {
-    console.error("Token verification failed:", error instanceof Error ? error.message : "Unknown error");
+    // Log the error but don't include sensitive token information
+    if (error instanceof jwt.TokenExpiredError) {
+      console.error("Token verification failed: Token expired");
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      console.error("Token verification failed: Invalid token");
+    } else {
+      console.error("Token verification failed:", error instanceof Error ? error.message : "Unknown error");
+    }
+
     throw error; // Re-throw the error to be handled by the caller
   }
 }

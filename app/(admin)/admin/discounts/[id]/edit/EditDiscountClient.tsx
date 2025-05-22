@@ -451,3 +451,4 @@ export default function EditDiscountClient({ id }: EditDiscountClientProps) {
       </div>
     </div>
   );
+}

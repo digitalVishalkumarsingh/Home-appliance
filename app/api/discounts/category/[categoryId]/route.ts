@@ -5,7 +5,7 @@ import { ObjectId } from "mongodb";
 // Get active discounts for a specific category
 export async function GET(
   request: Request,
-  context: { params: { categoryId: string } }
+  context: { params: Promise<{ categoryId: string }> }
 ) {
   try {
     // Get params from context

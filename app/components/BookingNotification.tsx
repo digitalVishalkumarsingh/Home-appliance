@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCalendarCheck, FaTimes } from 'react-icons/fa';
+import { FaCalendarCheck, FaTimes } from '@/app/components/icons';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 

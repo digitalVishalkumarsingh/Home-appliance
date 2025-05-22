@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 // Get bookings for a specific customer
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication

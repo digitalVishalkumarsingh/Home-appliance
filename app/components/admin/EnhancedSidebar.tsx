@@ -28,6 +28,7 @@ import {
   FaPercent,
   FaPlus,
   FaGift,
+  FaHeadset,
 } from "react-icons/fa";
 
 interface NavItem {
@@ -162,6 +163,18 @@ export default function EnhancedSidebar({
         { name: "Overview", href: "/admin/reports", icon: FaChartBar },
         { name: "Sales", href: "/admin/reports/sales", icon: FaMoneyBillWave },
         { name: "Bookings", href: "/admin/reports/bookings", icon: FaCalendarAlt },
+      ]
+    },
+    {
+      name: "Support",
+      href: "/admin/support",
+      icon: FaHeadset,
+      badge: 3,
+      children: [
+        { name: "All Tickets", href: "/admin/support", icon: FaHeadset },
+        { name: "Open Tickets", href: "/admin/support?status=open", icon: FaHeadset, badge: 2 },
+        { name: "In Progress", href: "/admin/support?status=in-progress", icon: FaHeadset, badge: 1 },
+        { name: "Resolved", href: "/admin/support?status=resolved", icon: FaHeadset },
       ]
     },
     { name: "Settings", href: "/admin/settings", icon: FaCog },

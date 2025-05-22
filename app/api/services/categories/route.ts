@@ -8,11 +8,24 @@ export async function GET(request: Request) {
     const { db } = await connectToDatabase();
 
     // Get all active service categories
-    const categories = await db
-      .collection("serviceCategories")
-      .find({ isActive: true })
-      .sort({ order: 1 })
-      .toArray();
+    let categories = [];
+    try {
+      // Try the standard MongoDB query chain
+      const cursor = db.collection("serviceCategories").find({ isActive: true });
+
+      // Check if sort method exists and is a function
+      if (cursor.sort && typeof cursor.sort === 'function') {
+        const sortedCursor = cursor.sort({ order: 1 });
+
+        // Check if toArray method exists and is a function
+        if (sortedCursor.toArray && typeof sortedCursor.toArray === 'function') {
+          categories = await sortedCursor.toArray();
+        }
+      }
+    } catch (queryError) {
+      console.error("Error in MongoDB query:", queryError);
+      // Continue with empty categories array
+    }
 
     // If no categories found in database, create default ones
     if (!categories || categories.length === 0) {
@@ -72,7 +85,7 @@ export async function GET(request: Request) {
       try {
         // Insert default categories
         await db.collection("serviceCategories").insertMany(defaultCategories);
-        
+
         return NextResponse.json({
           success: true,
           categories: defaultCategories,
@@ -80,7 +93,7 @@ export async function GET(request: Request) {
         });
       } catch (insertError) {
         console.error("Error inserting default categories:", insertError);
-        
+
         return NextResponse.json({
           success: true,
           categories: defaultCategories,

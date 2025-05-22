@@ -11,7 +11,8 @@ import AuthFooter from "@/app/components/AuthFooter";
 import { logger } from "@/app/config/logger";
 
 // Constants
-const API_ENDPOINT = "/api/auth/signup";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const API_ENDPOINT = `${API_BASE_URL.endsWith("/api") ? API_BASE_URL : API_BASE_URL + "/api"}/auth/signup`;
 
 // Zod schema for form validation
 const SignupSchema = z
@@ -107,22 +108,33 @@ export default function SignupPage() {
         throw new Error("Invalid phone number format");
       }
 
-      const response = await fetch(API_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // Add CSRF token in production
-        },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          email: formData.email.trim().toLowerCase(),
-          phone: formData.phone.trim(),
-          password: formData.password,
-        }),
-        credentials: "include",
-        // Add timeout to prevent hanging
-        signal: AbortSignal.timeout(15000), // 15 seconds
-      });
+      console.log("Sending signup request to:", API_ENDPOINT);
+
+      // Create a controller for the abort signal
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+
+      try {
+        const response = await fetch(API_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // Add CSRF token in production
+          },
+          body: JSON.stringify({
+            name: formData.name.trim(),
+            email: formData.email.trim().toLowerCase(),
+            phone: formData.phone.trim(),
+            password: formData.password,
+          }),
+          credentials: "include",
+          signal: controller.signal,
+          // Ensure we're using the correct mode for CORS
+          mode: "cors",
+        });
+
+        // Clear the timeout
+        clearTimeout(timeoutId);
 
       // Validate Content-Type to prevent JSON parsing errors
       const contentType = response.headers.get("Content-Type");
@@ -166,8 +178,18 @@ export default function SignupPage() {
       }).then(() => {
         router.push("/login?registered=true");
       });
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error("Fetch error:", fetchError);
+        throw new Error(
+          fetchError instanceof Error && fetchError.name === "AbortError"
+            ? "Request timed out. Please try again."
+            : "Network error. Please check your connection and try again."
+        );
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An error occurred during registration";
+      // The logger now has built-in error handling
       logger.error("Signup failed", { error: errorMessage });
       setServerError(errorMessage);
     } finally {

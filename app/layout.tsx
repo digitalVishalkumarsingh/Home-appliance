@@ -5,6 +5,7 @@ import LayoutWrapper from "./components/LayoutWrapper";
 import { Toaster } from 'react-hot-toast';
 import OfferNotificationsClient from "./components/OfferNotificationsClient";
 import NewUserWelcome from "./components/NewUserWelcome";
+import FirstTimeBookingNotification from "./components/FirstTimeBookingNotification";
 
 
 const geistSans = Geist({
@@ -38,6 +39,7 @@ export default function RootLayout({
         </LayoutWrapper>
         <OfferNotificationsClient />
         <NewUserWelcome />
+        <FirstTimeBookingNotification />
       </body>
     </html>
   );

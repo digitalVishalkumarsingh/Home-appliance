@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaTag, FaPercent, FaRupeeSign, FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
+import useAuth from "@/app/hooks/useAuth";
 
 interface Discount {
   _id: string;
@@ -41,6 +42,7 @@ export default function DiscountSelector({
   onDiscountApplied,
   isServicePage = false
 }: DiscountSelectorProps) {
+  const { user, isAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableDiscounts, setAvailableDiscounts] = useState<Discount[]>([]);
@@ -50,6 +52,11 @@ export default function DiscountSelector({
 
   // Fetch available discounts
   useEffect(() => {
+    // Skip for admin users
+    if (isAdmin) {
+      return;
+    }
+
     const fetchDiscounts = async () => {
       try {
         setLoading(true);
@@ -102,7 +109,7 @@ export default function DiscountSelector({
     if (categoryId || serviceId) {
       fetchDiscounts();
     }
-  }, [categoryId, serviceId, onDiscountApplied]);
+  }, [categoryId, serviceId, onDiscountApplied, isAdmin]);
 
   // Apply discount
   const applyDiscount = async (discount: Discount) => {
@@ -171,10 +178,15 @@ export default function DiscountSelector({
 
   // Auto-apply discount for service page if there's only one available
   useEffect(() => {
+    // Skip for admin users
+    if (isAdmin) {
+      return;
+    }
+
     if (isServicePage && selectedDiscount && !appliedDiscount) {
       applyDiscount(selectedDiscount);
     }
-  }, [isServicePage, selectedDiscount, appliedDiscount]);
+  }, [isServicePage, selectedDiscount, appliedDiscount, isAdmin]);
 
   // If we already have an applied discount from the parent component, don't show the selector
   if (appliedDiscount && isServicePage) {
@@ -195,8 +207,9 @@ export default function DiscountSelector({
     );
   }
 
-  if (availableDiscounts.length === 0 && !loading && !error) {
-    return null; // Don't show anything if no discounts are available
+  // Don't show anything for admin users or if no discounts are available
+  if (isAdmin || (availableDiscounts.length === 0 && !loading && !error)) {
+    return null;
   }
 
   // Different UI for service page vs booking flow

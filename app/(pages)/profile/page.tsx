@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import OrderHistory from '@/app/components/OrderHistory';
+import AdminRedirect from '@/app/components/AdminRedirect';
 
 interface UserProfile {
   name: string;
@@ -97,32 +98,28 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-700 mb-4">Not Logged In</h2>
-          <p className="text-gray-600 mb-6">Please log in to view your profile</p>
-          <button
-            onClick={() => router.push('/login')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  // Add AdminRedirect to prevent admin users from accessing this page
   return (
+    <>
+      <AdminRedirect />
+      {loading ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : !user ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-700 mb-4">Not Logged In</h2>
+            <p className="text-gray-600 mb-6">Please log in to view your profile</p>
+            <button
+              onClick={() => router.push('/login')}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
+      ) : (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -319,5 +316,7 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
+      )}
+    </>
   );
 }

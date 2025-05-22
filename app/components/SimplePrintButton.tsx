@@ -55,7 +55,7 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
 }) => {
   const [isPrinting, setIsPrinting] = useState(false);
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | undefined) => {
     switch ((status || '').toLowerCase()) {
       case "pending":
         return "#FEF3C7"; // Yellow background
@@ -115,20 +115,32 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
     try {
       setIsPrinting(true);
 
-      // Create a new window
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast.error("Could not open print window. Please check your popup blocker settings.");
-        setIsPrinting(false);
-        return;
-      }
+      // Create a print iframe instead of a new window
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
 
-      // Write the HTML content
-      printWindow.document.write(`
+      // Get the booking ID for the title
+      const bookingId = getBookingId(booking) || 'N/A';
+      const statusColor = getStatusColor(getBookingStatus(booking) || '');
+      const bookingStatus = (getBookingStatus(booking) || 'N/A').toUpperCase();
+      const createdDate = booking?.createdAt ? formatDate(booking.createdAt) : 'N/A';
+      const currentDate = formatDate(new Date().toISOString());
+      const serviceName = getServiceName(booking) || 'N/A';
+      const bookingAmount = booking?.amount !== undefined ? formatAmount(booking.amount) : 'N/A';
+      const bookingDate = getBookingDate(booking) ? formatDate(getBookingDate(booking)) : 'Not scheduled';
+      const bookingTime = getBookingTime(booking) || 'Not specified';
+      const customerName = getCustomerName();
+      const customerPhone = getCustomerPhone();
+      const customerEmail = getCustomerEmail();
+      const customerAddress = getCustomerAddress();
+
+      // Create HTML content
+      const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Booking Details - ${getBookingId(booking) || 'N/A'}</title>
+          <title>Booking Details - ${bookingId}</title>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
@@ -249,18 +261,18 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
             </div>
             <div>
               <h2 style="margin: 0; font-size: 20px;">Booking Receipt</h2>
-              <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">Date: ${formatDate(new Date().toISOString())}</p>
+              <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">Date: ${currentDate}</p>
             </div>
           </div>
 
           <div class="booking-header">
             <div>
-              <div class="booking-id">Booking ID: ${getBookingId(booking) || 'N/A'}</div>
-              <div class="booking-date">Created: ${booking?.createdAt ? formatDate(booking.createdAt) : 'N/A'}</div>
+              <div class="booking-id">Booking ID: ${bookingId}</div>
+              <div class="booking-date">Created: ${createdDate}</div>
             </div>
             <div>
-              <span class="status-badge" style="background-color: ${getStatusColor(getBookingStatus(booking) || '')}; color: #1F2937;">
-                Status: ${(getBookingStatus(booking) || 'N/A').toUpperCase()}
+              <span class="status-badge" style="background-color: ${statusColor}; color: #1F2937;">
+                Status: ${bookingStatus}
               </span>
             </div>
           </div>
@@ -270,19 +282,19 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
             <div class="grid">
               <div>
                 <div class="field-label">Name</div>
-                <div class="field-value">${getCustomerName()}</div>
+                <div class="field-value">${customerName}</div>
               </div>
               <div>
                 <div class="field-label">Phone</div>
-                <div class="field-value">${getCustomerPhone()}</div>
+                <div class="field-value">${customerPhone}</div>
               </div>
               <div>
                 <div class="field-label">Email</div>
-                <div class="field-value">${getCustomerEmail()}</div>
+                <div class="field-value">${customerEmail}</div>
               </div>
               <div>
                 <div class="field-label">Address</div>
-                <div class="field-value">${getCustomerAddress()}</div>
+                <div class="field-value">${customerAddress}</div>
               </div>
             </div>
           </div>
@@ -292,19 +304,19 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
             <div class="grid">
               <div>
                 <div class="field-label">Service</div>
-                <div class="field-value">${getServiceName(booking) || 'N/A'}</div>
+                <div class="field-value">${serviceName}</div>
               </div>
               <div>
                 <div class="field-label">Amount</div>
-                <div class="field-value">${booking?.amount !== undefined ? formatAmount(booking.amount) : 'N/A'}</div>
+                <div class="field-value">${bookingAmount}</div>
               </div>
               <div>
                 <div class="field-label">Date</div>
-                <div class="field-value">${getBookingDate(booking) ? formatDate(getBookingDate(booking)) : 'Not scheduled'}</div>
+                <div class="field-value">${bookingDate}</div>
               </div>
               <div>
                 <div class="field-label">Time</div>
-                <div class="field-value">${getBookingTime(booking) || 'Not specified'}</div>
+                <div class="field-value">${bookingTime}</div>
               </div>
             </div>
           </div>
@@ -314,40 +326,44 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
             <p>For any queries, please contact us at: <strong>9112564731</strong></p>
             <p>www.dizitsolution.com</p>
           </div>
-
-          <div class="no-print" style="text-align: center; margin-top: 30px;">
-            <button onclick="window.print(); setTimeout(() => window.close(), 500);" style="padding: 10px 20px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">
-              Print Receipt
-            </button>
-          </div>
         </body>
         </html>
-      `);
+      `;
 
-      printWindow.document.close();
+      // Write to the iframe
+      const iframeDocument = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDocument) {
+        throw new Error("Could not access iframe document");
+      }
 
-      // Add event listener for when the print dialog is closed
-      printWindow.onafterprint = () => {
-        setTimeout(() => {
-          printWindow.close();
-          setIsPrinting(false);
-        }, 500);
-      };
+      iframeDocument.open();
+      iframeDocument.write(htmlContent);
+      iframeDocument.close();
 
-      // Trigger print after a short delay to ensure content is loaded
+      // Wait for the iframe to load
       setTimeout(() => {
         try {
-          printWindow.print();
+          // Print the iframe
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+
+          // Show success message
           toast.success("Booking details ready for printing");
+
+          // Clean up
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            setIsPrinting(false);
+          }, 1000);
         } catch (error) {
           console.error("Print error:", error);
           toast.error("Failed to print. Please try again.");
+          document.body.removeChild(iframe);
+          setIsPrinting(false);
         }
-        setIsPrinting(false);
       }, 500);
-
     } catch (error) {
-      console.error("Error opening print window:", error);
+      console.error("Error preparing print view:", error);
       toast.error("Failed to prepare print view. Please try again.");
       setIsPrinting(false);
     }

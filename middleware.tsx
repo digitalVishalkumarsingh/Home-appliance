@@ -92,6 +92,24 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/', request.url));
       }
 
+      // Check if admin user is trying to access user-specific pages
+      const isUserSpecificPath =
+        path === '/profile' ||
+        path.startsWith('/profile/') ||
+        path === '/bookings' ||
+        path.startsWith('/bookings/') ||
+        path === '/orders' ||
+        path.startsWith('/orders/') ||
+        path === '/saved-services' ||
+        path === '/notifications' ||
+        path === '/settings' ||
+        path === '/support';
+
+      if (isUserSpecificPath && decoded.role === 'admin') {
+        // Redirect admin users to admin dashboard
+        return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+      }
+
       // If everything is fine, proceed with the request
       return NextResponse.next();
     } catch (error) {
@@ -131,4 +149,3 @@ export const config = {
     // Add other protected routes as needed
   ],
 };
-

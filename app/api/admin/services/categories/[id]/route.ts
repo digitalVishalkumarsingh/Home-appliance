@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 // Get a specific service category
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication
@@ -68,7 +68,7 @@ export async function GET(
 // Update a service category
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication
@@ -92,7 +92,7 @@ export async function PUT(
 
     // Parse request body
     const updateData = await request.json();
-    
+
     // Validate required fields
     if (!updateData.name || !updateData.slug) {
       return NextResponse.json(
@@ -117,7 +117,7 @@ export async function PUT(
 
     // Check if category exists
     const existingCategory = await db.collection("serviceCategories").findOne({ _id: categoryId });
-    
+
     if (!existingCategory) {
       return NextResponse.json(
         { success: false, message: "Service category not found" },
@@ -131,7 +131,7 @@ export async function PUT(
         slug: updateData.slug,
         _id: { $ne: categoryId }
       });
-      
+
       if (duplicateSlug) {
         return NextResponse.json(
           { success: false, message: "A category with this slug already exists" },
@@ -183,7 +183,7 @@ export async function PUT(
 // Delete a service category
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication
@@ -221,7 +221,7 @@ export async function DELETE(
 
     // Check if category exists
     const existingCategory = await db.collection("serviceCategories").findOne({ _id: categoryId });
-    
+
     if (!existingCategory) {
       return NextResponse.json(
         { success: false, message: "Service category not found" },
@@ -231,7 +231,7 @@ export async function DELETE(
 
     // Check if category has associated services
     const associatedServices = await db.collection("services").countDocuments({ categoryId: params.id });
-    
+
     if (associatedServices > 0) {
       return NextResponse.json(
         { success: false, message: "Cannot delete category with associated services" },

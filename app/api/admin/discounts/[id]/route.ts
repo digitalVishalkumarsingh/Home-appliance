@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 // Get a specific discount
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication
@@ -71,7 +71,7 @@ export async function GET(
 // Update a discount
 export async function PUT(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication
@@ -187,7 +187,7 @@ export async function PUT(
 // Delete a discount
 export async function DELETE(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin authentication

@@ -1,24 +1,29 @@
-"use client";
+import DiscountDetailClient from './DiscountDetailClient';
+import { Metadata } from 'next';
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+// Define the correct types for Next.js App Router
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+};
 
-export default function DiscountDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redirect to the edit page for now
-    router.push(`/admin/discounts/${params.id}/edit`);
-  }, [params.id, router]);
-
-  return (
-    <div className="flex justify-center items-center h-64">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      <p className="ml-2">Redirecting to discount edit page...</p>
-    </div>
-  );
+// Generate metadata for the page
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: `Discount Details | Admin Dashboard`,
+    description: `View discount details for ID: ${id}`,
+  };
 }
+
+// This is a dynamic route, so we don't pre-generate any paths
+export function generateStaticParams() {
+  return [];
+}
+
+// The page component
+export default async function DiscountDetailPage({ params }: Props) {
+  const { id } = await params;
+  return <DiscountDetailClient id={id} />;
+}
+

@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import MockRazorpayCheckout from './MockRazorpayCheckout';
 import DiscountSelector from './DiscountSelector';
+import FirstTimeOfferBanner from './FirstTimeOfferBanner';
+import useAuth from '@/app/hooks/useAuth';
 
 interface BookingPageProps {
   isOpen: boolean;
@@ -37,6 +39,7 @@ const BookingPage: React.FC<BookingPageProps> = ({
   onPaymentSuccess,
   userProfile
 }) => {
+  const { user, isAdmin } = useAuth();
   const [step, setStep] = useState(1); // 1: Details, 2: Payment
   const [name, setName] = useState(userProfile?.name || '');
   const [email, setEmail] = useState(userProfile?.email || '');
@@ -517,6 +520,15 @@ const BookingPage: React.FC<BookingPageProps> = ({
                                     </select>
                                   </div>
                                 </div>
+
+                                {/* First-Time Offer Banner - Only show for non-admin users */}
+                                {!isAdmin && (
+                                  <FirstTimeOfferBanner
+                                    serviceId={service.id}
+                                    originalPrice={originalPrice}
+                                    onOfferApplied={handleDiscountApplied}
+                                  />
+                                )}
 
                                 {/* Discount Selector */}
                                 {categoryId && (
