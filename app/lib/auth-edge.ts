@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromToken } from "./auth";
+import { getUserFromToken, verifyToken } from "./auth";
 import { logger } from "../config/logger";
+
+// Re-export verifyToken for edge runtime compatibility
+export { verifyToken };
 
 export async function middleware(request: NextRequest) {
   try {

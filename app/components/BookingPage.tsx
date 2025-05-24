@@ -9,26 +9,15 @@ import MockRazorpayCheckout from './MockRazorpayCheckout';
 import DiscountSelector from './DiscountSelector';
 import FirstTimeOfferBanner from './FirstTimeOfferBanner';
 import LocationFinder from './LocationFinder';
-import TechnicianDistanceCard from './TechnicianDistanceCard';
 import useAuth from '@/app/hooks/useAuth';
-import { FaMapMarkerAlt, FaUser, FaSpinner } from 'react-icons/fa';
+import { FaMapMarkerAlt } from 'react-icons/fa';
+import React from 'react';
 
 interface UserProfile {
   name?: string;
   email?: string;
   phone?: string;
   address?: string;
-}
-
-interface Technician {
-  id: string;
-  name: string;
-  rating: number;
-  completedJobs: number;
-  distance: number;
-  isAvailable: boolean;
-  specialization: string;
-  image?: string;
 }
 
 interface OrderData {
@@ -38,7 +27,6 @@ interface OrderData {
 }
 
 interface AuthState {
-  user: { role?: string } | null;
   isAdmin: boolean;
 }
 
@@ -66,8 +54,8 @@ const BookingPage: React.FC<BookingPageProps> = ({
   onPaymentSuccess,
   userProfile
 }) => {
-  const { user, isAdmin } = useAuth() as AuthState;
-  const [step, setStep] = useState(1); // 1: Details, 2: Technician Selection, 3: Payment
+  const { isAdmin } = useAuth();
+  const [step, setStep] = useState(1); // 1: Details, 2: Payment
   const [name, setName] = useState(userProfile?.name || '');
   const [email, setEmail] = useState(userProfile?.email || '');
   const [phone, setPhone] = useState(userProfile?.phone || '');
@@ -78,9 +66,7 @@ const BookingPage: React.FC<BookingPageProps> = ({
   const [error, setError] = useState('');
   const [showRazorpay, setShowRazorpay] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
-  const [availableTechnicians, setAvailableTechnicians] = useState<Technician[]>([]);
-  const [loadingTechnicians, setLoadingTechnicians] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cash'>('online');
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [appliedDiscount, setAppliedDiscount] = useState<any>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -131,75 +117,7 @@ const BookingPage: React.FC<BookingPageProps> = ({
     setAddress(locationData.address);
   };
 
-  // Fetch available technicians based on location and service
-  const fetchAvailableTechnicians = async () => {
-    if (!location) {
-      setError('Please select your location first');
-      return;
-    }
-
-    setLoadingTechnicians(true);
-    setError('');
-
-    try {
-      const mockTechnicians: Technician[] = [
-        {
-          id: 'tech1',
-          name: 'Vishal Singh',
-          rating: 4.8,
-          completedJobs: 124,
-          distance: calculateDistance(location.lat, location.lng, 28.6139, 77.2090),
-          isAvailable: true,
-          specialization: 'AC Repair',
-          image: '/images/technician1.jpg'
-        },
-        {
-          id: 'tech2',
-          name: 'Rahul Kumar',
-          rating: 4.5,
-          completedJobs: 98,
-          distance: calculateDistance(location.lat, location.lng, 28.7041, 77.1025),
-          isAvailable: true,
-          specialization: 'Washing Machine',
-        },
-        {
-          id: 'tech3',
-          name: 'Amit Sharma',
-          rating: 4.9,
-          completedJobs: 156,
-          distance: calculateDistance(location.lat, location.lng, 28.5355, 77.3910),
-          isAvailable: true,
-          specialization: 'All Appliances',
-        }
-      ];
-
-      const sortedTechnicians = mockTechnicians.sort((a, b) => a.distance - b.distance);
-      setAvailableTechnicians(sortedTechnicians);
-    } catch (error) {
-      console.error('Error fetching technicians:', error);
-      setError('Failed to fetch available technicians. Please try again.');
-    } finally {
-      setLoadingTechnicians(false);
-    }
-  };
-
-  // Calculate distance between two coordinates (Haversine formula)
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Radius of the earth in km
-    const dLat = deg2rad(lat2 - lat1);
-    const dLon = deg2rad(lon2 - lon1);
-    const a =
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c;
-    return parseFloat(distance.toFixed(1));
-  };
-
-  const deg2rad = (deg: number) => {
-    return deg * (Math.PI/180);
-  };
+  // Removed technician selection - technicians will accept jobs after booking
 
   // Generate available time slots
   const generateTimeSlots = () => {
@@ -227,18 +145,6 @@ const BookingPage: React.FC<BookingPageProps> = ({
         return;
       }
       setStep(2);
-      if (location) {
-        fetchAvailableTechnicians();
-      }
-      return;
-    }
-
-    if (step === 2) {
-      if (!selectedTechnicianId) {
-        setError('Please select a technician');
-        return;
-      }
-      setStep(3);
       return;
     }
 
@@ -246,6 +152,51 @@ const BookingPage: React.FC<BookingPageProps> = ({
     setError('');
 
     try {
+      // If cash payment, create booking directly without payment processing
+      if (paymentMethod === 'cash') {
+        const token = localStorage.getItem('token');
+        const bookingResponse = await fetch('/api/bookings/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token || ''}`,
+          },
+          body: JSON.stringify({
+            serviceId: service.id,
+            serviceName: service.title,
+            servicePrice: numericPrice,
+            customerName: name,
+            customerEmail: email,
+            customerPhone: phone,
+            address: address,
+            location: location,
+            scheduledDate: date,
+            scheduledTime: time,
+            notes: '',
+            paymentMethod: 'cash',
+            originalPrice: originalPrice,
+            discountApplied: appliedDiscount ? true : false,
+            discountId: appliedDiscount ? appliedDiscount._id : null,
+            discountName: appliedDiscount ? appliedDiscount.name : null,
+            discountAmount: appliedDiscount ? appliedDiscount.discountAmount : 0,
+          }),
+        });
+
+        const bookingData = await bookingResponse.json();
+
+        if (!bookingResponse.ok) {
+          throw new Error(bookingData.message || 'Failed to create booking');
+        }
+
+        // For cash payments, show success immediately
+        onPaymentSuccess('cash_payment', bookingData.booking.bookingId);
+        onClose();
+        toast.success('Booking confirmed! A technician will contact you soon. Payment will be collected in cash.');
+        setLoading(false);
+        return;
+      }
+
+      // For online payments, proceed with payment gateway
       console.log('Creating order with price:', numericPrice);
       if (appliedDiscount) {
         console.log('Discount details:', {
@@ -280,7 +231,7 @@ const BookingPage: React.FC<BookingPageProps> = ({
             discountId: appliedDiscount ? appliedDiscount._id : null,
             discountName: appliedDiscount ? appliedDiscount.name : null,
             discountAmount: appliedDiscount ? appliedDiscount.discountAmount : 0,
-            technicianId: selectedTechnicianId,
+            paymentMethod: paymentMethod,
             customerLocation: location ? { lat: location.lat, lng: location.lng } : null
           }
         }),
@@ -502,9 +453,7 @@ const BookingPage: React.FC<BookingPageProps> = ({
                         {/* Form */}
                         <div className="md:w-2/3 p-6">
                           <h2 className="text-2xl font-bold text-gray-800 mb-6">
-                            {step === 1 ? 'Enter Booking Details' :
-                             step === 2 ? 'Select a Technician' :
-                             'Review and Pay'}
+                            {step === 1 ? 'Enter Booking Details' : 'Review and Pay'}
                           </h2>
 
                           {error && (
@@ -642,55 +591,54 @@ const BookingPage: React.FC<BookingPageProps> = ({
                                   </div>
                                 )}
                               </div>
-                            ) : step === 2 ? (
-                              <div className="space-y-4">
-                                <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                                  <div className="flex items-center text-blue-800 mb-2">
-                                    <FaMapMarkerAlt className="h-5 w-5 text-blue-600 mr-2" />
-                                    <span className="font-medium">Select a technician near your location</span>
-                                  </div>
-                                  <p className="text-sm text-blue-700">
-                                    We'll match you with the best available technician for your service.
-                                  </p>
-                                </div>
-
-                                {loadingTechnicians ? (
-                                  <div className="flex justify-center items-center py-12">
-                                    <div className="text-center">
-                                      <FaSpinner className="animate-spin h-8 w-8 text-blue-500 mx-auto mb-4" aria-hidden="true" />
-                                      <p className="text-gray-600">Finding technicians near your location...</p>
-                                    </div>
-                                  </div>
-                                ) : availableTechnicians.length === 0 ? (
-                                  <div className="text-center py-8 border border-gray-200 rounded-lg">
-                                    <FaUser className="h-8 w-8 text-gray-400 mx-auto mb-2" aria-hidden="true" />
-                                    <p className="text-gray-500">No technicians found near your location</p>
-                                    <button
-                                      type="button"
-                                      onClick={fetchAvailableTechnicians}
-                                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                    >
-                                      Try Again
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div>
-                                    <h3 className="font-medium text-gray-700 mb-3">Available Technicians</h3>
-                                    <div className="space-y-2">
-                                      {availableTechnicians.map((technician) => (
-                                        <TechnicianDistanceCard
-                                          key={technician.id}
-                                          technician={technician}
-                                          onSelect={(id) => setSelectedTechnicianId(id)}
-                                          selected={selectedTechnicianId === technician.id}
-                                        />
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
                             ) : (
                               <div className="space-y-4">
+                                {/* Payment Method Selection */}
+                                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                  <h3 className="font-semibold text-blue-800 mb-3">Choose Payment Method</h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <label className="flex items-center p-3 bg-white rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors">
+                                      <input
+                                        type="radio"
+                                        name="paymentMethod"
+                                        value="online"
+                                        checked={paymentMethod === 'online'}
+                                        onChange={(e) => setPaymentMethod(e.target.value as 'online' | 'cash')}
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                      />
+                                      <div className="ml-3">
+                                        <div className="flex items-center">
+                                          <svg className="h-5 w-5 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                          </svg>
+                                          <span className="font-medium text-gray-900">Pay Online</span>
+                                        </div>
+                                        <p className="text-sm text-gray-600">Credit/Debit Card, UPI, Net Banking</p>
+                                      </div>
+                                    </label>
+
+                                    <label className="flex items-center p-3 bg-white rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors">
+                                      <input
+                                        type="radio"
+                                        name="paymentMethod"
+                                        value="cash"
+                                        checked={paymentMethod === 'cash'}
+                                        onChange={(e) => setPaymentMethod(e.target.value as 'online' | 'cash')}
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                      />
+                                      <div className="ml-3">
+                                        <div className="flex items-center">
+                                          <svg className="h-5 w-5 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                          </svg>
+                                          <span className="font-medium text-gray-900">Pay Cash</span>
+                                        </div>
+                                        <p className="text-sm text-gray-600">Pay to technician after service</p>
+                                      </div>
+                                    </label>
+                                  </div>
+                                </div>
+
                                 <div className="bg-gray-50 p-4 rounded-lg">
                                   <h3 className="font-semibold text-gray-800 mb-2">Booking Summary</h3>
                                   <div className="space-y-2">
@@ -724,18 +672,6 @@ const BookingPage: React.FC<BookingPageProps> = ({
                                       </div>
                                     )}
 
-                                    {selectedTechnicianId && (
-                                      <div className="flex justify-between mt-2 pt-2 border-t border-gray-200">
-                                        <span className="text-gray-600">Technician:</span>
-                                        <span className="font-medium">
-                                          {availableTechnicians.find(t => t.id === selectedTechnicianId)?.name || 'Selected Technician'}
-                                          <span className="ml-2 text-xs text-blue-600">
-                                            ({availableTechnicians.find(t => t.id === selectedTechnicianId)?.distance || 0} km away)
-                                          </span>
-                                        </span>
-                                      </div>
-                                    )}
-
                                     <div className="border-t border-gray-200 pt-2 mt-2">
                                       <div className="flex justify-between">
                                         <span className="text-gray-600">Base Price:</span>
@@ -764,12 +700,17 @@ const BookingPage: React.FC<BookingPageProps> = ({
                                   </div>
                                 </div>
 
-                                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                  <div className="flex items-center text-blue-800">
-                                    <svg className="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                                  <div className="flex items-center text-yellow-800">
+                                    <svg className="h-5 w-5 text-yellow-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    <span className="font-medium">Payment will be processed securely via Razorpay</span>
+                                    <span className="font-medium">
+                                      {paymentMethod === 'cash'
+                                        ? 'A technician will contact you soon and collect payment after service completion.'
+                                        : 'Payment will be processed securely. A technician will be assigned after booking confirmation.'
+                                      }
+                                    </span>
                                   </div>
                                 </div>
                               </div>
@@ -782,10 +723,10 @@ const BookingPage: React.FC<BookingPageProps> = ({
                                     type="submit"
                                     className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none transition-colors font-medium"
                                   >
-                                    Continue to Select Technician
+                                    Continue to Payment
                                   </button>
                                 </div>
-                              ) : step === 2 ? (
+                              ) : (
                                 <>
                                   <button
                                     type="button"
@@ -793,23 +734,6 @@ const BookingPage: React.FC<BookingPageProps> = ({
                                     className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 focus:outline-none transition-colors font-medium"
                                   >
                                     Back to Details
-                                  </button>
-                                  <button
-                                    type="submit"
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none transition-colors font-medium"
-                                    disabled={!selectedTechnicianId}
-                                  >
-                                    Continue to Payment
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => setStep(2)}
-                                    className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 focus:outline-none transition-colors font-medium"
-                                  >
-                                    Back
                                   </button>
                                   <button
                                     type="submit"
@@ -824,12 +748,19 @@ const BookingPage: React.FC<BookingPageProps> = ({
                                         </svg>
                                         Processing...
                                       </>
+                                    ) : paymentMethod === 'cash' ? (
+                                      <>
+                                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Confirm Booking
+                                      </>
                                     ) : (
                                       <>
                                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
-                                        Proceed to Pay {service.price}
+                                        Proceed to Pay ₹{Math.round(numericPrice)}
                                       </>
                                     )}
                                   </button>

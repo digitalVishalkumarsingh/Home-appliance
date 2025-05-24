@@ -1,17 +1,33 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
-import { ObjectId } from "mongodb";
 
-// Seed discounts for testing
-export async function GET(request: Request) {
+// Seed discounts for testing (admin only)
+export async function GET(request: NextRequest) {
   try {
+    // Verify admin authentication
+    const token = getTokenFromRequest(request);
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized: No token provided" },
+        { status: 401 }
+      );
+    }
+
+    const decoded = verifyToken(token);
+    if (!decoded || typeof decoded !== "object" || !("role" in decoded) || decoded.role !== "admin") {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized: Admin access required" },
+        { status: 403 }
+      );
+    }
+
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Check if there are any existing discounts
     const existingDiscounts = await db.collection("discounts").countDocuments();
-    
+
     if (existingDiscounts > 0) {
       return NextResponse.json({
         success: true,
@@ -22,11 +38,11 @@ export async function GET(request: Request) {
 
     // Get service categories
     const categories = await db.collection("serviceCategories").find({}).toArray();
-    
+
     // If no categories found, create default ones
     let acCategory;
     let washingMachineCategory;
-    
+
     if (categories.length === 0) {
       // Create default categories
       const defaultCategories = [
@@ -47,52 +63,52 @@ export async function GET(request: Request) {
           updatedAt: new Date().toISOString()
         }
       ];
-      
+
       const result = await db.collection("serviceCategories").insertMany(defaultCategories);
-      
+
       // Get the inserted categories
       acCategory = {
         _id: result.insertedIds[0],
         ...defaultCategories[0]
       };
-      
+
       washingMachineCategory = {
         _id: result.insertedIds[1],
         ...defaultCategories[1]
       };
     } else {
       // Find AC and Washing Machine categories
-      acCategory = categories.find(c => 
-        c.slug === "ac-services" || 
-        c.name.toLowerCase().includes("ac") || 
+      acCategory = categories.find(c =>
+        c.slug === "ac-services" ||
+        c.name.toLowerCase().includes("ac") ||
         c.name.toLowerCase().includes("air conditioner")
       );
-      
-      washingMachineCategory = categories.find(c => 
-        c.slug === "washing-machine-services" || 
-        c.name.toLowerCase().includes("washing") || 
+
+      washingMachineCategory = categories.find(c =>
+        c.slug === "washing-machine-services" ||
+        c.name.toLowerCase().includes("washing") ||
         c.name.toLowerCase().includes("laundry")
       );
-      
+
       // If categories not found, use the first two categories
       if (!acCategory && categories.length > 0) {
         acCategory = categories[0];
       }
-      
+
       if (!washingMachineCategory && categories.length > 1) {
         washingMachineCategory = categories[1];
       } else if (!washingMachineCategory && categories.length > 0) {
         washingMachineCategory = categories[0];
       }
     }
-    
+
     // Create sample discounts
     const now = new Date();
     const oneMonthLater = new Date();
     oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
-    
+
     const sampleDiscounts = [];
-    
+
     if (acCategory) {
       sampleDiscounts.push({
         name: "Summer AC Special",
@@ -108,7 +124,7 @@ export async function GET(request: Request) {
         updatedAt: now.toISOString()
       });
     }
-    
+
     if (washingMachineCategory) {
       sampleDiscounts.push({
         name: "Monsoon Washing Machine Offer",
@@ -124,7 +140,7 @@ export async function GET(request: Request) {
         updatedAt: now.toISOString()
       });
     }
-    
+
     // Add a general discount for all services
     if (acCategory) {
       sampleDiscounts.push({
@@ -141,11 +157,11 @@ export async function GET(request: Request) {
         updatedAt: now.toISOString()
       });
     }
-    
+
     // Insert discounts
     if (sampleDiscounts.length > 0) {
       const result = await db.collection("discounts").insertMany(sampleDiscounts);
-      
+
       return NextResponse.json({
         success: true,
         message: "Sample discounts created successfully",

@@ -42,10 +42,9 @@ const BookingPrintButton: React.FC<{ booking: Booking }> = ({ booking }) => {
   }, []);
 
   const handlePrint = useReactToPrint({
-    // @ts-expect-error - content is a valid prop but TypeScript definition might be outdated
-    content: () => componentRef.current,
+    contentRef: componentRef,
     documentTitle: `Booking_${booking.bookingId || booking._id}`,
-    onBeforeGetContent: () => {
+    onBeforePrint: () => {
       setIsPrinting(true);
       return new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -57,8 +56,8 @@ const BookingPrintButton: React.FC<{ booking: Booking }> = ({ booking }) => {
       setIsPrinting(false);
       toast.success("Booking details ready for printing");
     },
-    onPrintError: (error) => {
-      console.error("Print error:", error);
+    onPrintError: (errorLocation, error) => {
+      console.error("Print error:", errorLocation, error);
       setIsPrinting(false);
       toast.error("Failed to print booking details. Please try again.");
     },

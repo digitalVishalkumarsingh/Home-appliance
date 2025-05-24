@@ -73,40 +73,24 @@ export async function GET(request: NextRequest) {
       endDate: { $gte: currentDate },
     });
 
-    // If no first-time offer exists, use a default (avoid auto-insertion)
-    const defaultOffer = {
-      title: "First-Time Booking Discount",
-      description: "Special discount for your first booking with us!",
-      type: "first-booking",
-      discountType: "percentage",
-      discountValue: 10, // 10% discount
-      code: "FIRSTBOOKING",
-      minOrderValue: 0,
-      maxDiscountAmount: 500, // Maximum discount of ₹500
-      isActive: true,
-      startDate: new Date(currentDate.getFullYear(), 0, 1),
-      endDate: new Date(currentDate.getFullYear() + 1, 11, 31),
-      createdAt: currentDate,
-      updatedAt: currentDate,
-    };
-
-    const offer = firstTimeOffer || defaultOffer;
-
     // Determine if user is eligible
     const isEligible = bookingsCount === 0;
+
+    // Only use admin-created offers - no hardcoded defaults
+    const offer = firstTimeOffer;
 
     logger.debug("First-time booking eligibility checked", {
       userId,
       bookingsCount,
       isEligible,
-      offerId: firstTimeOffer?._id?.toString() || "default",
+      offerId: firstTimeOffer?._id?.toString() || "none",
     });
 
     return NextResponse.json({
       success: true,
       isEligible,
       bookingsCount,
-      offer: isEligible ? offer : null,
+      offer: isEligible && offer ? offer : null,
     });
   } catch (error) {
     logger.error("Error checking first-time booking eligibility", {

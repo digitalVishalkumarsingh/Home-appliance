@@ -138,11 +138,11 @@ export default function ServiceDetailsClient({ serviceId }: ServiceDetailsClient
           ];
 
           // Safely extract service properties with fallbacks
-          const serviceId = foundStaticService.id || serviceId;
+          const extractedServiceId = foundStaticService.id || serviceId;
           const serviceTitle = foundStaticService.title || 'Service';
           const serviceDesc = foundStaticService.desc || 'Professional service at your doorstep';
           const serviceImg = foundStaticService.img || '/images/services/default.jpg';
-          const serviceDetails = foundStaticService.details || defaultFeatures;
+          const serviceDetails = (foundStaticService as any).details || defaultFeatures;
 
           // Determine price format safely
           let priceDisplay = '₹599 onwards';
@@ -150,16 +150,16 @@ export default function ServiceDetailsClient({ serviceId }: ServiceDetailsClient
             if (typeof foundStaticService.pricing === 'number') {
               priceDisplay = `₹${foundStaticService.pricing} onwards`;
             } else if (typeof foundStaticService.pricing === 'object' && foundStaticService.pricing !== null) {
-              if (foundStaticService.pricing.basic && foundStaticService.pricing.basic.price) {
-                priceDisplay = foundStaticService.pricing.basic.price;
-              } else if ('price' in foundStaticService.pricing) {
-                priceDisplay = `₹${foundStaticService.pricing.price} onwards`;
+              if ((foundStaticService.pricing as any).basic && (foundStaticService.pricing as any).basic.price) {
+                priceDisplay = (foundStaticService.pricing as any).basic.price;
+              } else if ('basePrice' in foundStaticService.pricing) {
+                priceDisplay = `₹${foundStaticService.pricing.basePrice} onwards`;
               }
-            } else if (foundStaticService.price) {
+            } else if ((foundStaticService as any).price) {
               // Direct price property
-              priceDisplay = typeof foundStaticService.price === 'string'
-                ? foundStaticService.price
-                : `₹${foundStaticService.price} onwards`;
+              priceDisplay = typeof (foundStaticService as any).price === 'string'
+                ? (foundStaticService as any).price
+                : `₹${(foundStaticService as any).price} onwards`;
             }
           } catch (priceError) {
             console.error('Error parsing price:', priceError);
@@ -168,7 +168,7 @@ export default function ServiceDetailsClient({ serviceId }: ServiceDetailsClient
 
           // Create transformed service object
           setService({
-            id: serviceId,
+            id: extractedServiceId,
             title: serviceTitle,
             description: serviceDesc,
             imageUrl: serviceImg,
@@ -179,9 +179,9 @@ export default function ServiceDetailsClient({ serviceId }: ServiceDetailsClient
 
           // Set category ID for discount lookup
           try {
-            if (foundStaticService.category) {
-              setCategoryId(foundStaticService.category);
-            } else if (foundStaticService.type) {
+            if ((foundStaticService as any).category) {
+              setCategoryId((foundStaticService as any).category);
+            } else if ((foundStaticService as any).type) {
               // Map service type to category ID
               const categoryMap: Record<string, string> = {
                 'ac': 'ac-services',
@@ -191,7 +191,7 @@ export default function ServiceDetailsClient({ serviceId }: ServiceDetailsClient
                 'tv': 'tv-services',
                 'service': 'general-services'
               };
-              setCategoryId(categoryMap[foundStaticService.type] || 'general-services');
+              setCategoryId(categoryMap[(foundStaticService as any).type] || 'general-services');
             } else {
               // Default to general services
               setCategoryId('general-services');
@@ -201,19 +201,7 @@ export default function ServiceDetailsClient({ serviceId }: ServiceDetailsClient
             setCategoryId('general-services');
           }
 
-          // For testing, set a mock discount
-          setAppliedDiscount({
-            _id: "mock-discount-1",
-            name: "Summer Special",
-            discountType: "percentage",
-            discountValue: 10,
-            discountAmount: 59.9,
-            formattedDiscountAmount: "₹59.9",
-            discountedPrice: 539.1,
-            formattedDiscountedPrice: "₹539.1",
-            formattedOriginalPrice: "₹599",
-            savings: "Save 10%"
-          });
+          // No hardcoded discounts - discounts are now managed by admins only
 
           setLoading(false);
           return;
@@ -462,7 +450,7 @@ export default function ServiceDetailsClient({ serviceId }: ServiceDetailsClient
 
               <div className="flex space-x-2">
                 <a
-                  href={getWhatsAppLink()}
+                  href={getWhatsAppLink(`Hi, I'm interested in ${service.title} service. Please provide more details.`)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-md transition-colors duration-300 flex items-center justify-center"

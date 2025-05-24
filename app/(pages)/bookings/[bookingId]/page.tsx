@@ -271,13 +271,6 @@ export default function BookingDetailsPage() {
           </Link>
           <SimplePrintButton
             booking={booking}
-            getBookingId={getBookingId}
-            getServiceName={(b) => b.service}
-            getBookingDate={(b) => b.date}
-            getBookingTime={(b) => b.time || 'Not specified'}
-            getBookingStatus={(b) => b.status}
-            formatDate={formatDate}
-            formatAmount={formatAmount}
           />
         </div>
 

@@ -394,13 +394,6 @@ export default function UserBookingsPage() {
                         </button>
                         <SimplePrintButton
                           booking={booking}
-                          getBookingId={getBookingId}
-                          getServiceName={getServiceName}
-                          getBookingDate={getBookingDate}
-                          getBookingTime={getBookingTime}
-                          getBookingStatus={getBookingStatus}
-                          formatDate={formatDate}
-                          formatAmount={formatAmount}
                         />
                       </div>
                     </td>
@@ -422,13 +415,6 @@ export default function UserBookingsPage() {
                 {selectedBooking && (
                   <SimplePrintButton
                     booking={selectedBooking}
-                    getBookingId={getBookingId}
-                    getServiceName={getServiceName}
-                    getBookingDate={getBookingDate}
-                    getBookingTime={getBookingTime}
-                    getBookingStatus={getBookingStatus}
-                    formatDate={formatDate}
-                    formatAmount={formatAmount}
                   />
                 )}
                 <button

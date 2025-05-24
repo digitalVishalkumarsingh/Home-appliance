@@ -117,27 +117,21 @@ export async function POST(request: NextRequest) {
       endDate: { $gte: now },
     });
 
-    // Use default offer if none exists (without auto-insertion)
-    const defaultOffer = {
-      title: "First-Time Booking Discount",
-      description: "Special discount for your first booking with us!",
-      type: "first-booking",
-      discountType: "percentage",
-      discountValue: 10,
-      code: "FIRSTBOOKING",
-      minOrderValue: 0,
-      maxDiscountAmount: 500,
-      isActive: true,
-      startDate: new Date(now.getFullYear(), 0, 1),
-      endDate: new Date(now.getFullYear() + 1, 11, 31),
-      createdAt: now,
-      updatedAt: now,
-    };
+    // Only use admin-created offers - no hardcoded defaults
+    if (!firstTimeOffer) {
+      logger.debug("No first-time offer available", { userId });
+      return NextResponse.json({
+        success: false,
+        message: "No first-time booking offers available",
+        isEligible: false,
+        offer: null,
+      });
+    }
 
-    const offer = firstTimeOffer || defaultOffer;
+    const offer = firstTimeOffer;
     logger.debug("First-time offer selected", {
       userId,
-      offerId: firstTimeOffer?._id?.toString() || "default",
+      offerId: firstTimeOffer._id.toString(),
     });
 
     // Validate minimum order value
@@ -172,7 +166,7 @@ export async function POST(request: NextRequest) {
     // Create applied offer object
     const appliedOffer = {
       ...offer,
-      _id: firstTimeOffer?._id || null,
+      _id: firstTimeOffer._id,
       originalPrice: price,
       discountedPrice,
       discountAmount,
@@ -184,18 +178,16 @@ export async function POST(request: NextRequest) {
     };
 
     // Record offer usage
-    if (firstTimeOffer) {
-      await db.collection("specialOfferUsage").insertOne({
-        userId,
-        offerId: firstTimeOffer._id,
-        serviceId: serviceId ? new ObjectId(serviceId) : null,
-        originalPrice: price,
-        discountedPrice,
-        discountAmount,
-        appliedAt: now,
-      });
-      logger.debug("Offer usage recorded", { userId, offerId: firstTimeOffer._id.toString(), serviceId });
-    }
+    await db.collection("specialOfferUsage").insertOne({
+      userId,
+      offerId: firstTimeOffer._id,
+      serviceId: serviceId ? new ObjectId(serviceId) : null,
+      originalPrice: price,
+      discountedPrice,
+      discountAmount,
+      appliedAt: now,
+    });
+    logger.debug("Offer usage recorded", { userId, offerId: firstTimeOffer._id.toString(), serviceId });
 
     return NextResponse.json({
       success: true,
