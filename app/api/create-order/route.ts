@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/app/lib/mongodb';
 
 // Razorpay initialization
-const Razorpay = require('razorpay');
+import Razorpay from 'razorpay';
 
 // Get Razorpay keys from environment variables
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;

@@ -8,10 +8,10 @@ type Props = {
 };
 
 // Interface for discount API response
-interface Discount {
-  _id: string;
-  name: string;
-}
+// interface Discount {
+//   _id: string;
+//   name: string;
+// }
 
 // Fetches discount name for metadata
 async function fetchDiscountName(id: string, token?: string): Promise<string | null> {
@@ -86,7 +86,7 @@ export default async function EditDiscountPage({ params }: Props) {
   const { id } = await params;
 
   // Server-side authentication check
-  let isAuthorized = false;
+  // Note: Authentication is handled client-side by EditDiscountLayout
   try {
     const token = typeof window === "undefined" ? undefined : localStorage.getItem("token");
     if (token) {
@@ -99,7 +99,7 @@ export default async function EditDiscountPage({ params }: Props) {
 
       if (response.ok) {
         const data = await response.json();
-        isAuthorized = data.success;
+        // isAuthorized = data.success; // Handled client-side
       }
     }
   } catch (error) {

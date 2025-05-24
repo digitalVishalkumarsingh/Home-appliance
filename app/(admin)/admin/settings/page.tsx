@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FaSpinner, FaSave, FaGlobe, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCog, FaMoneyBillWave, FaPercent, FaUserCog } from "react-icons/fa";
+import { FaSpinner, FaSave, FaGlobe, FaCog, FaMoneyBillWave, FaPercent, FaUserCog } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 

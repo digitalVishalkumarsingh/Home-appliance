@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useAuth from '@/app/hooks/useAuth';
-import { FaSpinner, FaCheckCircle, FaTimesCircle, FaUserShield, FaUser } from 'react-icons/fa';
+import { FaSpinner, FaTimesCircle, FaUserShield, FaUser } from 'react-icons/fa';
 
 export default function AdminCheckPage() {
   const { user, isAuthenticated, isLoading, isAdmin } = useAuth();
@@ -16,7 +16,7 @@ export default function AdminCheckPage() {
       const timer = setTimeout(() => {
         router.push('/admin/dashboard');
       }, 3000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [isLoading, isAuthenticated, isAdmin, router]);
@@ -75,24 +75,24 @@ export default function AdminCheckPage() {
                 </div>
               )}
             </div>
-            
+
             <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">
               {isAdmin ? 'Admin User Detected' : 'Regular User Detected'}
             </h1>
-            
+
             <p className="text-center text-gray-600 mb-6">
-              {isAdmin 
-                ? 'You are logged in as an admin user. You will be redirected to the admin dashboard shortly.' 
+              {isAdmin
+                ? 'You are logged in as an admin user. You will be redirected to the admin dashboard shortly.'
                 : 'You are logged in as a regular user. You should see the user navigation bar.'}
             </p>
-            
+
             <div className="bg-gray-50 p-4 rounded-lg mb-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-2">User Information</h2>
               <p className="text-gray-700"><strong>Name:</strong> {user?.name || 'Not provided'}</p>
               <p className="text-gray-700"><strong>Email:</strong> {user?.email}</p>
               <p className="text-gray-700"><strong>Role:</strong> {user?.role}</p>
             </div>
-            
+
             <div className="flex justify-center space-x-4">
               {isAdmin ? (
                 <button
@@ -109,7 +109,7 @@ export default function AdminCheckPage() {
                   Go to User Profile
                 </button>
               )}
-              
+
               <button
                 onClick={() => setShowDebug(!showDebug)}
                 className="px-6 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
@@ -117,7 +117,7 @@ export default function AdminCheckPage() {
                 {showDebug ? 'Hide Debug Info' : 'Show Debug Info'}
               </button>
             </div>
-            
+
             {showDebug && (
               <div className="mt-8 p-4 bg-gray-800 text-white rounded-lg overflow-auto max-h-96">
                 <h3 className="text-lg font-semibold mb-2">Debug Information</h3>

@@ -102,7 +102,7 @@ export default function AdminSupportPage() {
     } finally {
       setIsLoadingTickets(false);
     }
-  }, [pagination.page, statusFilter, searchTerm]);
+  }, [pagination.page, pagination.limit, statusFilter, searchTerm]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -127,7 +127,7 @@ export default function AdminSupportPage() {
       setSearchTerm(value);
       setPagination((prev) => ({ ...prev, page: 1 }));
     }, 300),
-    []
+    [setSearchTerm, setPagination]
   );
 
   const handleViewTicket = useCallback((ticket: SupportTicket) => {

@@ -1,9 +1,9 @@
 import { Metadata } from "next";
 
-interface Discount {
-  _id: string;
-  name: string;
-}
+// interface Discount {
+//   _id: string;
+//   name: string;
+// }
 
 interface MetadataParams {
   params: { id: string };

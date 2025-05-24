@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import crypto from "crypto";
@@ -19,7 +19,7 @@ interface VerifyPaymentRequest {
 export async function POST(request: Request) {
   try {
     // Extract token from request
-    const token = getTokenFromRequest(new (require("next/server").NextRequest)(request));
+    const token = getTokenFromRequest(new NextRequest(request));
     if (!token) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: No token provided" },

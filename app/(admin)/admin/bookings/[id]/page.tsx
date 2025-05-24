@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
@@ -43,13 +43,18 @@ interface Booking {
   paymentStatus: "pending" | "paid" | "failed" | "refunded";
   amount: number;
   createdAt: string;
-  notes?: { [key: string]: any };
-  payment?: any;
+  notes?: { [key: string]: string | number | boolean };
+  payment?: {
+    paymentId?: string;
+    orderId?: string;
+    method?: string;
+    createdAt?: string;
+    status?: string;
+  };
 }
 
 export default function AdminBookingDetailsPage() {
   const params = useParams();
-  const router = useRouter();
   const bookingId = params.id as string;
 
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -62,7 +67,7 @@ export default function AdminBookingDetailsPage() {
     if (bookingId) {
       fetchBookingDetails();
     }
-  }, [bookingId]);
+  }, [bookingId, fetchBookingDetails]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -77,7 +82,7 @@ export default function AdminBookingDetailsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showPaymentStatusDropdown]);
 
-  const fetchBookingDetails = async () => {
+  const fetchBookingDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -102,14 +107,15 @@ export default function AdminBookingDetailsPage() {
       } else {
         throw new Error(data.message || "Failed to fetch booking details");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching booking details:", error);
-      setError(error.message || "Failed to load booking details");
+      const errorMessage = error instanceof Error ? error.message : "Failed to load booking details";
+      setError(errorMessage);
       toast.error("Failed to load booking details");
     } finally {
       setLoading(false);
     }
-  };
+  }, [bookingId]);
 
   const handleStatusUpdate = async (status: string) => {
     try {
@@ -137,9 +143,10 @@ export default function AdminBookingDetailsPage() {
       } else {
         throw new Error(data.message || "Failed to update booking status");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating booking status:", error);
-      toast.error(error.message || "Failed to update booking status");
+      const errorMessage = error instanceof Error ? error.message : "Failed to update booking status";
+      toast.error(errorMessage);
     } finally {
       setProcessingAction(null);
     }
@@ -172,9 +179,10 @@ export default function AdminBookingDetailsPage() {
       } else {
         throw new Error(data.message || "Failed to update payment status");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating payment status:", error);
-      toast.error(error.message || "Failed to update payment status");
+      const errorMessage = error instanceof Error ? error.message : "Failed to update payment status";
+      toast.error(errorMessage);
     } finally {
       setProcessingAction(null);
     }
@@ -280,7 +288,7 @@ export default function AdminBookingDetailsPage() {
           <div className="flex h-64 flex-col items-center justify-center">
             <FaInfoCircle className="mb-4 h-12 w-12 text-blue-500" aria-hidden="true" />
             <h2 className="mb-2 text-xl font-bold text-gray-900">Booking Not Found</h2>
-            <p className="mb-4 text-gray-600">The booking you're looking for could not be found.</p>
+            <p className="mb-4 text-gray-600">The booking you&apos;re looking for could not be found.</p>
             <Link
               href="/admin/bookings"
               className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"

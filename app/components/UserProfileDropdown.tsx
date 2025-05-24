@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUser, FaSignOutAlt, FaShoppingBag, FaCog, FaUserCircle, FaQuestionCircle, FaBell, FaHeart } from "react-icons/fa";
+import { FaUser, FaSignOutAlt, FaShoppingBag, FaCog, FaUserCircle, FaQuestionCircle, FaBell, FaHeart, FaTachometerAlt, FaWrench } from "react-icons/fa";
 import useAuth from "@/app/hooks/useAuth";
 import { toast } from "react-hot-toast";
 
@@ -145,6 +145,19 @@ export default function UserProfileDropdown() {
             <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.name || "User"}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+              {user.role && (
+                <p className="text-xs font-medium mt-1">
+                  <span className={`px-2 py-1 rounded-full text-xs ${
+                    user.role === 'admin'
+                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                      : user.role === 'technician'
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                  }`}>
+                    {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                  </span>
+                </p>
+              )}
             </div>
 
             <Link
@@ -158,7 +171,41 @@ export default function UserProfileDropdown() {
               </div>
             </Link>
 
+            {/* Admin Dashboard - Only show for admin users */}
+            {user.role === "admin" && (
+              <>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                <Link
+                  href="/admin/dashboard"
+                  className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 bg-blue-50 dark:bg-blue-900"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <div className="flex items-center">
+                    <FaTachometerAlt className="mr-2 text-blue-600 dark:text-blue-400" />
+                    <span className="font-medium text-blue-600 dark:text-blue-400">Admin Dashboard</span>
+                  </div>
+                </Link>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              </>
+            )}
 
+            {/* Technician Dashboard - Only show for technician users */}
+            {user.role === "technician" && (
+              <>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                <Link
+                  href="/technician/dashboard"
+                  className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 bg-green-50 dark:bg-green-900"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <div className="flex items-center">
+                    <FaWrench className="mr-2 text-green-600 dark:text-green-400" />
+                    <span className="font-medium text-green-600 dark:text-green-400">Technician Dashboard</span>
+                  </div>
+                </Link>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              </>
+            )}
 
             <Link
               href="/orders"

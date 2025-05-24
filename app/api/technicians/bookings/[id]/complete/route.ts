@@ -11,8 +11,9 @@ const CompleteBookingSchema = z.object({
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const resolvedParams = await params;
   const session = await connectToDatabase({ timeoutMs: 10000 });
   const { db, client } = session;
 
@@ -48,7 +49,7 @@ export async function POST(
     const { notes } = parsedBody.data;
 
     // Validate booking ID
-    const bookingId = params.id;
+    const bookingId = resolvedParams.id;
     if (!ObjectId.isValid(bookingId)) {
       return NextResponse.json(
         { success: false, message: "Invalid booking ID" },

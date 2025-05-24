@@ -85,7 +85,7 @@ export default function AdminSignup() {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 8) {
       newErrors.password = "Password must be at least 8 characters";
-    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(formData.password)) {
+    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/.test(formData.password)) {
       newErrors.password = "Password must include uppercase, lowercase, number, and special character";
     }
 
@@ -109,7 +109,7 @@ export default function AdminSignup() {
       ...prev,
       [name]: value,
     }));
-    
+
     // Clear error when user starts typing
     if (errors[name as keyof SignupFormData]) {
       setErrors(prev => ({
@@ -121,7 +121,7 @@ export default function AdminSignup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       toast.error("Please fix the errors below");
       return;
@@ -148,7 +148,7 @@ export default function AdminSignup() {
 
       if (response.ok && data.success) {
         toast.success("Admin account created successfully! Please login to continue.");
-        
+
         // Redirect to admin login page
         setTimeout(() => {
           router.push("/admin/login");
@@ -166,24 +166,24 @@ export default function AdminSignup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-4 sm:p-6 md:p-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md"
+        className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 w-full max-w-md mx-auto"
       >
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaUserShield className="text-blue-600 text-2xl" />
+        <div className="text-center mb-6 md:mb-8">
+          <div className="bg-blue-100 w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
+            <FaUserShield className="text-blue-600 text-xl sm:text-2xl" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Admin Account</h1>
-          <p className="text-gray-600">Set up your admin access</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1 sm:mb-2">Create Admin Account</h1>
+          <p className="text-sm sm:text-base text-gray-600">Set up your admin access</p>
         </div>
 
         {/* Signup Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {/* Name Field */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -375,7 +375,7 @@ export default function AdminSignup() {
               Sign In
             </Link>
           </div>
-          
+
           <div className="text-sm text-gray-500">
             <Link href="/" className="hover:text-gray-700">
               ← Back to Home
@@ -386,3 +386,4 @@ export default function AdminSignup() {
     </div>
   );
 }
+

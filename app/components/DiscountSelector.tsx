@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaTag, FaPercent, FaRupeeSign, FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
+import { FaTag, FaPercent, FaRupeeSign, FaTimes, FaInfoCircle } from "react-icons/fa";
 import useAuth from "@/app/hooks/useAuth";
 
 interface Discount {
@@ -114,7 +114,7 @@ export default function DiscountSelector({
   }, [categoryId, serviceId, onDiscountApplied, isAdmin]);
 
   // Apply discount
-  const applyDiscount = async (discount: Discount) => {
+  const applyDiscount = useCallback(async (discount: Discount) => {
     try {
       setLoading(true);
       setError(null);
@@ -157,7 +157,7 @@ export default function DiscountSelector({
       setLoading(false);
       setShowDiscounts(false);
     }
-  };
+  }, [serviceId, categoryId, normalizedPrice, onDiscountApplied]);
 
   // Remove applied discount
   const removeDiscount = () => {
@@ -185,7 +185,7 @@ export default function DiscountSelector({
     if (isServicePage && selectedDiscount && !appliedDiscount) {
       applyDiscount(selectedDiscount);
     }
-  }, [isServicePage, selectedDiscount, appliedDiscount, isAdmin]);
+  }, [isServicePage, selectedDiscount, appliedDiscount, isAdmin, applyDiscount]);
 
   // If we already have an applied discount from the parent component, don't show the selector
   if (appliedDiscount && isServicePage) {

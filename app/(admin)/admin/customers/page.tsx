@@ -6,7 +6,6 @@ import {
   FaSearch,
   FaSpinner,
   FaUser,
-  FaCalendarAlt,
   FaRupeeSign,
   FaEnvelope,
   FaPhone,

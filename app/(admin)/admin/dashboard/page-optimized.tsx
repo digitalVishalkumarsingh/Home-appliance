@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { FaSpinner, FaCalendarCheck, FaUsers, FaRupeeSign, FaUserCog, FaRedo } from "react-icons/fa";
+import { FaCalendarCheck, FaUsers, FaRupeeSign, FaUserCog, FaRedo } from "react-icons/fa";
 import Link from "next/link";
 
 interface Stats {
@@ -63,11 +63,10 @@ export default function AdminDashboardOptimized() {
         throw new Error("You don't have admin privileges.");
       }
 
-      // Validate token with API
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/verify`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      // Validate token with API - cookies are automatically sent
+      const response = await fetch(`/api/admin/verify`, {
+        method: 'GET',
+        credentials: 'include', // Include cookies in the request
       });
 
       setLoadingProgress(70);
@@ -104,17 +103,12 @@ export default function AdminDashboardOptimized() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("Authentication token not found.");
-      }
-
       setLoadingProgress(80);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/stats`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      // Use cookies for authentication instead of localStorage token
+      const response = await fetch(`/api/admin/stats`, {
+        method: 'GET',
+        credentials: 'include', // Include cookies in the request
       });
 
       if (!response.ok) {

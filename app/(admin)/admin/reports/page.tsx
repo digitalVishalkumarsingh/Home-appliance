@@ -66,10 +66,11 @@ export default function ReportsPage() {
       } else {
         throw new Error(data.message || "Failed to fetch report data");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching report data:", error);
-      setError(error.message || "Failed to fetch report data");
-      toast.error(error.message || "Failed to fetch report data");
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch report data";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

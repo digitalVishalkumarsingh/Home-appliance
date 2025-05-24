@@ -6,7 +6,6 @@ import {
   FaUser,
   FaEnvelope,
   FaPhone,
-  FaCalendarAlt,
   FaMapMarkerAlt,
   FaRupeeSign,
   FaSpinner,
@@ -16,7 +15,6 @@ import {
   FaTimes,
   FaClock,
 } from "react-icons/fa";
-import Link from "next/link";
 import { toast } from "react-hot-toast";
 
 interface Customer {
@@ -369,7 +367,7 @@ export default function CustomerDetailPage() {
           <div className="p-6 text-center">
             <FaHistory className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No bookings yet</h3>
-            <p className="mt-1 text-sm text-gray-500">This customer hasn't made any bookings yet.</p>
+            <p className="mt-1 text-sm text-gray-500">This customer hasn&apos;t made any bookings yet.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

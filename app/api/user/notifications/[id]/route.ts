@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(new (require("next/server").NextRequest)(request));
+    const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {
       return NextResponse.json(
@@ -86,7 +86,7 @@ export async function DELETE(
 ) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(new (require("next/server").NextRequest)(request));
+    const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {
       return NextResponse.json(

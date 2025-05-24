@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { toast } from "react-hot-toast";
-import { FaEye, FaEyeSlash, FaUserShield, FaSpinner } from "react-icons/fa";
-import Link from "next/link";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { toast } from 'react-hot-toast';
+import { FaUserShield, FaLock, FaEye, FaEyeSlash, FaSpinner, FaSignInAlt } from 'react-icons/fa';
+import Link from 'next/link';
 
 interface LoginFormData {
   email: string;
   password: string;
 }
 
-export default function AdminLogin() {
+export default function AdminLoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState<LoginFormData>({
-    email: "",
-    password: "",
+    email: '',
+    password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,10 +26,10 @@ export default function AdminLogin() {
   useEffect(() => {
     const checkExistingAuth = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem('token');
         if (!token) return;
 
-        const response = await fetch("/api/auth/me", {
+        const response = await fetch('/api/auth/me', {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -37,13 +37,13 @@ export default function AdminLogin() {
 
         if (response.ok) {
           const data = await response.json();
-          if (data.success && data.user?.role === "admin") {
-            console.log("Admin already logged in, redirecting to dashboard");
-            router.replace("/admin/dashboard");
+          if (data.success && data.user?.role === 'admin') {
+            console.log('Admin already logged in, redirecting to dashboard');
+            router.replace('/admin/dashboard');
           }
         }
       } catch (error) {
-        console.error("Error checking existing auth:", error);
+        console.error('Error checking existing auth:', error);
       }
     };
 
@@ -54,15 +54,15 @@ export default function AdminLogin() {
     const newErrors: Partial<LoginFormData> = {};
 
     if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
+      newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email";
+      newErrors.email = 'Please enter a valid email';
     }
 
     if (!formData.password) {
-      newErrors.password = "Password is required";
+      newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+      newErrors.password = 'Password must be at least 6 characters';
     }
 
     setErrors(newErrors);
@@ -89,60 +89,57 @@ export default function AdminLogin() {
     e.preventDefault();
     
     if (!validateForm()) {
-      toast.error("Please fix the errors below");
+      toast.error('Please fix the errors below');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+        }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
         // Check if user is admin
-        if (data.user?.role !== "admin") {
-          toast.error("Access denied. Admin credentials required.");
-          setIsLoading(false);
+        if (data.user.role !== 'admin') {
+          toast.error('Access denied. Admin credentials required.');
           return;
         }
 
-        // Store authentication data
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("freshAdminLogin", "true");
+        // Store auth data
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
 
-        // Set cookies for server-side authentication
-        document.cookie = `token=${data.token}; path=/; max-age=86400; SameSite=Strict`;
-        document.cookie = `auth_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
-
-        toast.success("Admin login successful! Redirecting to dashboard...");
-
-        // Force redirect to admin dashboard
+        toast.success(`Welcome Admin ${data.user.name}! Redirecting to dashboard...`);
+        
+        // Redirect to admin dashboard
         setTimeout(() => {
-          window.location.replace("/admin/dashboard");
+          router.push('/admin/dashboard');
         }, 1000);
 
       } else {
-        toast.error(data.message || "Login failed. Please try again.");
+        toast.error(data.message || 'Login failed. Please check your credentials.');
       }
     } catch (error) {
-      console.error("Login error:", error);
-      toast.error("Network error. Please check your connection and try again.");
+      console.error('Login error:', error);
+      toast.error('Network error. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -151,11 +148,11 @@ export default function AdminLogin() {
       >
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaUserShield className="text-blue-600 text-2xl" />
+          <div className="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaUserShield className="text-blue-600 text-3xl" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Admin Login</h1>
-          <p className="text-gray-600">Access the admin dashboard</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Admin Portal</h1>
+          <p className="text-gray-600">Sign in to access admin dashboard</p>
         </div>
 
         {/* Login Form */}
@@ -163,7 +160,7 @@ export default function AdminLogin() {
           {/* Email Field */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
+              Admin Email
             </label>
             <input
               type="email"
@@ -172,7 +169,7 @@ export default function AdminLogin() {
               value={formData.email}
               onChange={handleInputChange}
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                errors.email ? "border-red-500" : "border-gray-300"
+                errors.email ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Enter your admin email"
               disabled={isLoading}
@@ -189,13 +186,13 @@ export default function AdminLogin() {
             </label>
             <div className="relative">
               <input
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 id="password"
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors pr-12 ${
-                  errors.password ? "border-red-500" : "border-gray-300"
+                  errors.password ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="Enter your password"
                 disabled={isLoading}
@@ -226,7 +223,10 @@ export default function AdminLogin() {
                 Signing In...
               </>
             ) : (
-              "Sign In to Admin Panel"
+              <>
+                <FaSignInAlt className="mr-2" />
+                Sign In to Admin Portal
+              </>
             )}
           </button>
         </form>
@@ -234,31 +234,30 @@ export default function AdminLogin() {
         {/* Footer Links */}
         <div className="mt-8 text-center space-y-4">
           <div className="text-sm text-gray-600">
-            Don't have an admin account?{" "}
+            Need an admin account?{' '}
             <Link href="/admin/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-              Create Admin Account
+              Create Account
             </Link>
           </div>
           
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 space-x-4">
+            <Link href="/login" className="hover:text-gray-700">
+              User Login
+            </Link>
+            <span>•</span>
             <Link href="/" className="hover:text-gray-700">
-              ← Back to Home
+              Back to Home
             </Link>
           </div>
         </div>
 
-        {/* Debug Info (only in development) */}
-        {process.env.NODE_ENV === "development" && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-600 mb-2">Development Mode:</p>
-            <Link
-              href="/admin-debug"
-              className="text-xs text-blue-600 hover:text-blue-700 underline"
-            >
-              Admin Debug Tools
-            </Link>
-          </div>
-        )}
+        {/* Security Notice */}
+        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-xs text-yellow-800 text-center">
+            <FaLock className="inline mr-1" />
+            This is a secure admin portal. Only authorized personnel should access this area.
+          </p>
+        </div>
       </motion.div>
     </div>
   );

@@ -193,7 +193,7 @@ export default function SpecialOffersPage() {
     debounce((value: string) => {
       setSearchTerm(value);
     }, 300),
-    []
+    [setSearchTerm]
   );
 
   const formatDate = useCallback((dateString: string) => {

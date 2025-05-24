@@ -35,7 +35,12 @@ interface Booking {
   cancelledBy?: string;
   cancellationReason?: string;
   createdAt: string;
-  payment?: any;
+  payment?: {
+    method: string;
+    status: string;
+    transactionId?: string;
+    amount: number;
+  };
 }
 
 export default function CancelledBookingsPage() {
@@ -81,9 +86,10 @@ export default function CancelledBookingsPage() {
       } else {
         throw new Error(data.message || "Invalid response format");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching cancelled bookings:", error);
-      toast.error(error.message || "Failed to load cancelled bookings");
+      const errorMessage = error instanceof Error ? error.message : "Failed to load cancelled bookings";
+      toast.error(errorMessage);
       setBookings([]);
       setFilteredBookings([]);
     } finally {
@@ -253,9 +259,10 @@ export default function CancelledBookingsPage() {
 
       toast.success("Booking reactivated successfully");
       fetchCancelledBookings();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error reactivating booking:", error);
-      toast.error(error.message || "Failed to reactivate booking");
+      const errorMessage = error instanceof Error ? error.message : "Failed to reactivate booking";
+      toast.error(errorMessage);
     } finally {
       setProcessingBookingId(null);
     }

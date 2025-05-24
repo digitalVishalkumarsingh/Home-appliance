@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { FaSpinner, FaRedo } from "react-icons/fa";
+import { FaRedo } from "react-icons/fa";
 
 interface DiscountDetailClientProps {
   id: string;

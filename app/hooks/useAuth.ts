@@ -168,6 +168,23 @@ export default function useAuth() {
       setIsAuthenticated(false);
       if (!errorMessage.includes("Unauthorized")) {
         toast.error("Failed to load user data", { duration: 4000 });
+      } else {
+        // If unauthorized, clear all auth data and redirect to login
+        console.log('useAuth - Unauthorized error, clearing auth data');
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("token_backup");
+
+        // Clear cookies
+        document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+        document.cookie = "auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+        document.cookie = "token_backup=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1000);
       }
     } finally {
       setIsLoading(false);

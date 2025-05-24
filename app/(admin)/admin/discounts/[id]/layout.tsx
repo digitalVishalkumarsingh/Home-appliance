@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { FaSpinner, FaRedo } from "react-icons/fa";
+import { FaRedo } from "react-icons/fa";
 
 interface DiscountLayoutProps {
   children: React.ReactNode;
@@ -57,7 +57,7 @@ export default function DiscountLayout({ children }: DiscountLayoutProps) {
       });
       setIsLoading(false);
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     checkAdminAuth();

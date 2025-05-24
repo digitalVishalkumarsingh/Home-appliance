@@ -7,7 +7,6 @@ import {
   FaUserCog,
   FaEnvelope,
   FaPhone,
-  FaTools,
   FaMapMarkerAlt,
   FaSave,
   FaArrowLeft,
@@ -93,7 +92,7 @@ export default function AddTechnicianPage() {
         [name]: value,
       }));
     }, 300),
-    []
+    [setFormData]
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {

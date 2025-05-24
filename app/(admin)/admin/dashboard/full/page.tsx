@@ -11,7 +11,9 @@ import Link from "next/link";
 
 interface User {
   role: string;
-  [key: string]: any;
+  name?: string;
+  email?: string;
+  id?: string;
 }
 
 export default function FullAdminDashboard() {
@@ -49,11 +51,10 @@ export default function FullAdminDashboard() {
         throw new Error("You don't have admin privileges.");
       }
 
-      // Validate token with API
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/verify`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      // Validate token with API - cookies are automatically sent
+      const response = await fetch(`/api/admin/verify`, {
+        method: 'GET',
+        credentials: 'include', // Include cookies in the request
       });
 
       setLoadingProgress(70);

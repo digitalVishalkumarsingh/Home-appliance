@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { FaSave, FaArrowLeft } from "react-icons/fa";
@@ -69,9 +69,9 @@ export default function NewDiscountPage() {
       setCategories(defaultCategories);
       setLoadingCategories(false);
     }
-  }, []);
+  }, [fetchCategories]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -120,7 +120,7 @@ export default function NewDiscountPage() {
       setCategories(defaultCategories);
       setLoadingCategories(false);
     }
-  };
+  }, [router]);
 
   const onSubmit = async (data: DiscountFormData) => {
     try {

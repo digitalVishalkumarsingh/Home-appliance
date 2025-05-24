@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   FaUserCog,
@@ -17,7 +17,6 @@ import {
   FaStar,
   FaClipboardList,
   FaTools,
-  FaClock,
   FaExclamationTriangle,
   FaKey,
   FaLock,
@@ -69,7 +68,6 @@ interface Booking {
 
 export default function TechnicianDetailsPage() {
   const params = useParams();
-  const router = useRouter();
   const [technician, setTechnician] = useState<Technician | null>(null);
   const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,13 +76,7 @@ export default function TechnicianDetailsPage() {
   const [resendingPassword, setResendingPassword] = useState(false);
   const [passwordInfo, setPasswordInfo] = useState<{password: string, email: string} | null>(null);
 
-  useEffect(() => {
-    if (params.id) {
-      fetchTechnicianDetails();
-    }
-  }, [params.id]);
-
-  const fetchTechnicianDetails = async () => {
+  const fetchTechnicianDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -126,9 +118,10 @@ export default function TechnicianDetailsPage() {
       } else {
         throw new Error(data.message || "Failed to fetch technician details");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching technician details:", error);
-      setError(error.message || "Failed to load technician details. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to load technician details. Please try again.";
+      setError(errorMessage);
 
       // For demo purposes, set mock data if API fails
       if (!technician) {
@@ -201,7 +194,13 @@ export default function TechnicianDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
+
+  useEffect(() => {
+    if (params.id) {
+      fetchTechnicianDetails();
+    }
+  }, [params.id, fetchTechnicianDetails]);
 
   const handleStatusToggle = async () => {
     if (!technician) return;
@@ -241,9 +240,10 @@ export default function TechnicianDetailsPage() {
       } else {
         throw new Error(data.message || "Failed to update technician status");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating technician status:", error);
-      toast.error(error.message || "Failed to update status. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to update status. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setStatusUpdating(false);
     }
@@ -293,9 +293,10 @@ export default function TechnicianDetailsPage() {
       } else {
         throw new Error(data.message || "Failed to resend password");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error resending password:", error);
-      toast.error(error.message || "Failed to resend password. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to resend password. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setResendingPassword(false);
     }
@@ -394,7 +395,7 @@ export default function TechnicianDetailsPage() {
             <div className="ml-3">
               <h3 className="text-sm font-medium text-yellow-800">Login Credentials</h3>
               <div className="mt-2 text-sm text-yellow-700">
-                <p className="mb-1">The technician's password has been reset. Please provide these credentials to the technician:</p>
+                <p className="mb-1">The technician&apos;s password has been reset. Please provide these credentials to the technician:</p>
                 <div className="bg-white p-3 rounded border border-yellow-200 font-mono text-sm">
                   <p><strong>Email:</strong> {passwordInfo.email}</p>
                   <p><strong>Password:</strong> {passwordInfo.password}</p>
@@ -456,7 +457,7 @@ export default function TechnicianDetailsPage() {
                 </div>
                 <div className="mt-1 text-xs text-gray-500 flex items-center">
                   <FaLock className="h-3 w-3 text-gray-400 mr-1" />
-                  <span>Login credentials can be sent to this email using the "Resend Password" button</span>
+                  <span>Login credentials can be sent to this email using the &quot;Resend Password&quot; button</span>
                 </div>
               </dd>
             </div>

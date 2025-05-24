@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   FaUserCog,
   FaSpinner,
@@ -31,14 +30,13 @@ interface TechnicianPerformance {
 }
 
 export default function TechnicianPerformancePage() {
-  const [technicians, setTechnicians] = useState<TechnicianPerformance[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [technicians] = useState<TechnicianPerformance[]>([]);
+  const [loading] = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<"week" | "month" | "year">("month");
   const [sortField, setSortField] = useState<keyof TechnicianPerformance>("completedBookings");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const router = useRouter();
 
 
   const handleSort = (field: keyof TechnicianPerformance) => {

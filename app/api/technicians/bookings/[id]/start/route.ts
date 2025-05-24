@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
@@ -10,7 +10,6 @@ export async function POST(
 ) {
   try {
     // Verify technician authentication
-    const { NextRequest } = require("next/server");
     const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {

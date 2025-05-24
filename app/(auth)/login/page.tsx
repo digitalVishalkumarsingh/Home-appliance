@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { FaUser, FaLock, FaSignInAlt } from "react-icons/fa";
 import Swal from "sweetalert2";
+import { toast } from "react-hot-toast";
 
 import { logger } from "@/app/config/logger";
 
@@ -228,7 +229,8 @@ export default function LoginPage() {
             window.location.href = "/contact";
           } else if (data.user.role === "admin" || data.isAdmin === true) {
             console.log("Admin user detected, redirecting to admin dashboard");
-            window.location.replace("/admin/dashboard");
+            // Use absolute path for admin dashboard
+            window.location.href = "/admin/dashboard";
           } else if (data.user.role === "technician") {
             console.log("Technician user detected, redirecting to technician dashboard");
             window.location.replace("/technician/dashboard");
@@ -250,15 +252,16 @@ export default function LoginPage() {
         // Set a flag to indicate this is a fresh login
         localStorage.setItem("freshAdminLogin", "true");
 
-        // Force immediate redirect using window.location.replace for admin users
-        // This is more forceful than window.location.href
-        window.location.replace("/admin/dashboard");
+        // Show a quick success message for admin
+        toast.success(`Welcome Admin ${data.user.name || data.user.email}! Redirecting to dashboard...`, {
+          duration: 2000,
+        });
 
-        // As a fallback, also try the href method after a short delay
+        // Force immediate redirect using window.location.href for admin users
         setTimeout(() => {
-          console.log("Fallback redirect to admin dashboard");
+          console.log("Redirecting to admin dashboard");
           window.location.href = "/admin/dashboard";
-        }, 1000);
+        }, 500);
 
         // Don't execute any more code after redirect attempt
         return;

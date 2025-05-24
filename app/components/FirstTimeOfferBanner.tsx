@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaGift, FaTag, FaPercent, FaRupeeSign, FaCheck } from "react-icons/fa";
+import { FaGift, FaCheck } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import useAuth from "@/app/hooks/useAuth";
 
@@ -38,19 +38,7 @@ export default function FirstTimeOfferBanner({
   const [offer, setOffer] = useState<AppliedOffer | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
-  useEffect(() => {
-    // Only check for first-time offers if the user is authenticated and not an admin
-    if (isAuthenticated && !isLoading && user) {
-      // Skip for admin users
-      if (user.role === 'admin') {
-        return;
-      }
-
-      checkFirstTimeOffer();
-    }
-  }, [isAuthenticated, isLoading, user, originalPrice]);
-
-  const checkFirstTimeOffer = async () => {
+  const checkFirstTimeOffer = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -92,7 +80,19 @@ export default function FirstTimeOfferBanner({
     } finally {
       setLoading(false);
     }
-  };
+  }, [serviceId, originalPrice, onOfferApplied]);
+
+  useEffect(() => {
+    // Only check for first-time offers if the user is authenticated and not an admin
+    if (isAuthenticated && !isLoading && user) {
+      // Skip for admin users
+      if (user.role === 'admin') {
+        return;
+      }
+
+      checkFirstTimeOffer();
+    }
+  }, [isAuthenticated, isLoading, user, originalPrice, checkFirstTimeOffer]);
 
   if (loading || !offer) {
     return null;

@@ -70,14 +70,14 @@ export default function DashboardAnalytics() {
       }
 
       const data = await response.json();
-      
+
       if (data.success && data.reportData) {
         setReportData(data.reportData);
       } else {
         // If the API is not ready yet, use mock data
         setReportData(generateMockReportData());
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching report data:", error);
       // Use mock data if the API fails
       setReportData(generateMockReportData());
@@ -327,29 +327,29 @@ export default function DashboardAnalytics() {
               <Pie data={serviceRevenueChartData} options={{ maintainAspectRatio: false }} />
             )}
             {activeChart === "bookings" && (
-              <Bar 
-                data={monthlyBookingsChartData} 
-                options={{ 
+              <Bar
+                data={monthlyBookingsChartData}
+                options={{
                   maintainAspectRatio: false,
                   scales: {
                     y: {
                       beginAtZero: true
                     }
                   }
-                }} 
+                }}
               />
             )}
             {activeChart === "revenue" && (
-              <Bar 
-                data={monthlyRevenueChartData} 
-                options={{ 
+              <Bar
+                data={monthlyRevenueChartData}
+                options={{
                   maintainAspectRatio: false,
                   scales: {
                     y: {
                       beginAtZero: true
                     }
                   }
-                }} 
+                }}
               />
             )}
           </div>
@@ -364,22 +364,22 @@ function generateMockReportData(): ReportData {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const currentMonth = new Date().getMonth();
   const recentMonths = months.slice(Math.max(0, currentMonth - 5), currentMonth + 1);
-  
+
   const services = ["AC Repair", "AC Installation", "Washing Machine Repair", "Refrigerator Service", "TV Repair"];
-  
+
   const bookingsByMonth: { [key: string]: number } = {};
   const revenueByMonth: { [key: string]: number } = {};
-  
+
   recentMonths.forEach(month => {
     bookingsByMonth[month] = Math.floor(Math.random() * 50) + 10;
     revenueByMonth[month] = Math.floor(Math.random() * 50000) + 10000;
   });
-  
+
   const revenueByService: { [key: string]: number } = {};
   services.forEach(service => {
     revenueByService[service] = Math.floor(Math.random() * 100000) + 20000;
   });
-  
+
   return {
     totalBookings: Object.values(bookingsByMonth).reduce((sum, count) => sum + count, 0),
     totalRevenue: Object.values(revenueByMonth).reduce((sum, amount) => sum + amount, 0),

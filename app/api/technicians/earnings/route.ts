@@ -1,4 +1,4 @@
-// import { NextResponse } from "next/server";
+// import { NextResponse, NextRequest } from "next/server";
 // import { connectToDatabase } from "@/app/lib/mongodb";
 // import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 // import { ObjectId } from "mongodb";
@@ -288,7 +288,7 @@
 //     );
 //   }
 // }
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
@@ -297,8 +297,7 @@ import { ObjectId } from "mongodb";
 export async function GET(request: Request) {
   try {
     // Verify technician authentication
-    // @ts-ignore
-    const token = getTokenFromRequest(new (require("next/server").NextRequest)(request));
+    const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {
       return NextResponse.json(
@@ -440,8 +439,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     // Verify technician authentication
-    // @ts-ignore
-    const token = getTokenFromRequest(new (require("next/server").NextRequest)(request));
+    const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {
       return NextResponse.json(

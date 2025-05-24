@@ -6,6 +6,13 @@ import { toast } from "react-hot-toast";
 import AdminSidebar from "@/app/components/admin/AdminSidebar";
 import AdminHeader from "@/app/components/admin/AdminHeader";
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
@@ -13,7 +20,7 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -26,9 +33,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         }
 
         const response = await fetch("/api/auth/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          method: 'GET',
+          credentials: 'include', // Include cookies in the request
         });
 
         if (response.ok) {

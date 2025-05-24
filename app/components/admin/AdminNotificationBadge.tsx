@@ -28,22 +28,18 @@ export default function AdminNotificationBadge() {
 
   useEffect(() => {
     fetchNotifications();
-    
+
     // Poll for new notifications every 30 seconds
     const intervalId = setInterval(fetchNotifications, 30000);
-    
+
     return () => clearInterval(intervalId);
   }, []);
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
       const response = await fetch('/api/admin/notifications?limit=10', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        method: 'GET',
+        credentials: 'include', // Include cookies in the request
       });
 
       if (!response.ok) {
@@ -51,7 +47,7 @@ export default function AdminNotificationBadge() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setNotifications(data.notifications || []);
         setUnreadCount(data.unreadCount || 0);
@@ -64,13 +60,10 @@ export default function AdminNotificationBadge() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
       const response = await fetch(`/api/admin/notifications/${notificationId}/read`, {
         method: 'PATCH',
+        credentials: 'include', // Include cookies in the request
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -87,10 +80,10 @@ export default function AdminNotificationBadge() {
             : notification
         )
       );
-      
+
       // Update unread count
       setUnreadCount(Math.max(0, unreadCount - 1));
-      
+
       // Update important unread count if needed
       const notification = notifications.find(n => n._id === notificationId);
       if (notification && notification.isImportant) {
@@ -104,13 +97,11 @@ export default function AdminNotificationBadge() {
   const markAllAsRead = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) return;
 
       const response = await fetch('/api/admin/notifications/read', {
         method: 'POST',
+        credentials: 'include', // Include cookies in the request
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ markAll: true }),
@@ -129,7 +120,7 @@ export default function AdminNotificationBadge() {
       );
       setUnreadCount(0);
       setImportantUnreadCount(0);
-      
+
       toast.success('All notifications marked as read');
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
@@ -141,13 +132,10 @@ export default function AdminNotificationBadge() {
 
   const toggleImportant = async (notificationId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
       const response = await fetch(`/api/admin/notifications/${notificationId}/important`, {
         method: 'PATCH',
+        credentials: 'include', // Include cookies in the request
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -157,7 +145,7 @@ export default function AdminNotificationBadge() {
       }
 
       const data = await response.json();
-      
+
       // Update local state
       setNotifications(
         notifications.map((notification) =>
@@ -166,7 +154,7 @@ export default function AdminNotificationBadge() {
             : notification
         )
       );
-      
+
       // Update important unread count if needed
       if (!notifications.find(n => n._id === notificationId)?.isRead) {
         if (data.isImportant) {
@@ -175,7 +163,7 @@ export default function AdminNotificationBadge() {
           setImportantUnreadCount(Math.max(0, importantUnreadCount - 1));
         }
       }
-      
+
       toast.success(data.message);
     } catch (error) {
       console.error('Error toggling notification importance:', error);
@@ -186,7 +174,7 @@ export default function AdminNotificationBadge() {
   const handleNotificationClick = (notification: Notification) => {
     // Mark as read
     markAsRead(notification._id);
-    
+
     // Navigate to appropriate page based on notification type
     if (notification.type === 'booking' && notification.referenceId) {
       router.push(`/admin/bookings/${notification.referenceId}`);
@@ -195,7 +183,7 @@ export default function AdminNotificationBadge() {
     } else if (notification.type === 'cancellation' && notification.referenceId) {
       router.push(`/admin/bookings/${notification.referenceId}`);
     }
-    
+
     // Close notification panel
     setShowNotifications(false);
   };
@@ -327,7 +315,7 @@ export default function AdminNotificationBadge() {
                               )}
                             </button>
                           </div>
-                          <p 
+                          <p
                             className="text-sm text-gray-600"
                             onClick={() => handleNotificationClick(notification)}
                           >

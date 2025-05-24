@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     }
 
     // Validate password strength
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
     if (!passwordRegex.test(password)) {
       logger.warn("Weak password in admin signup request", { email });
       return NextResponse.json(

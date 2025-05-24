@@ -5,7 +5,7 @@ import { ObjectId } from "mongodb";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -26,7 +26,8 @@ export async function POST(
     }
 
     // Get booking ID from params
-    const bookingId = params.id;
+    const resolvedParams = await params;
+    const bookingId = resolvedParams.id;
     if (!bookingId) {
       return NextResponse.json(
         { success: false, message: "Booking ID is required" },
@@ -89,19 +90,19 @@ export async function POST(
 
     // Update booking with rating
     await db.collection("bookings").updateOne(
-      { 
+      {
         $or: [
           { _id: ObjectId.isValid(bookingId) ? new ObjectId(bookingId) : bookingId },
           { bookingId: bookingId }
         ]
       },
-      { 
-        $set: { 
+      {
+        $set: {
           rating,
           feedback: feedback || "",
           ratedAt: new Date(),
           updatedAt: new Date()
-        } 
+        }
       }
     );
 
@@ -122,8 +123,8 @@ export async function POST(
         // Update technician
         await db.collection("technicians").updateOne(
           { _id: technician._id },
-          { 
-            $set: { 
+          {
+            $set: {
               rating: parseFloat(newAverageRating.toFixed(1)),
               totalRatings,
               updatedAt: new Date()

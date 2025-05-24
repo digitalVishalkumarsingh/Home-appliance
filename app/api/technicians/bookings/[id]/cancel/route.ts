@@ -17,11 +17,13 @@ export const config = {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   let client;
+  let resolvedParams: { id: string };
   try {
-    logger.debug('Processing POST /api/bookings/[id]/cancel', { bookingId: params.id });
+    resolvedParams = await params;
+    logger.debug('Processing POST /api/bookings/[id]/cancel', { bookingId: resolvedParams.id });
 
     // Verify authentication
     const token = getTokenFromRequest(request);
@@ -63,7 +65,7 @@ export async function POST(
     logger.debug('Connected to MongoDB');
 
     // Validate booking ID
-    const bookingId = params.id;
+    const bookingId = resolvedParams.id;
     if (!ObjectId.isValid(bookingId)) {
       logger.warn('Invalid booking ID', { bookingId });
       return NextResponse.json(
@@ -225,7 +227,7 @@ export async function POST(
     logger.error('Error cancelling booking', {
       error: error.message,
       stack: error.stack,
-      bookingId: params.id,
+      bookingId: resolvedParams?.id || 'unknown',
     });
     const message =
       error.message.includes('Booking not found')

@@ -18,7 +18,6 @@ import {
   FaRedo,
 } from "react-icons/fa";
 import { toast } from "react-hot-toast";
-import Link from "next/link";
 import { ErrorBoundary } from "react-error-boundary";
 import debounce from "lodash.debounce";
 

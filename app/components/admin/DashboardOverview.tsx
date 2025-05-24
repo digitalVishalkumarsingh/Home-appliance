@@ -59,7 +59,7 @@ export default function DashboardOverview() {
       // Check if we're in the browser environment
       if (typeof window === 'undefined') {
         console.warn("Not in browser environment, using mock data");
-        useMockData();
+        setMockData();
         return;
       }
 
@@ -85,7 +85,7 @@ export default function DashboardOverview() {
 
       if (!token) {
         console.warn("No authentication token found, using mock data");
-        useMockData();
+        setMockData();
         return;
       }
 
@@ -136,18 +136,18 @@ export default function DashboardOverview() {
         }
       } catch (fetchError) {
         console.error("Error in fetch operation:", fetchError);
-        useMockData();
+        setMockData();
       }
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
-      useMockData();
+      setMockData();
     } finally {
       setLoading(false);
     }
   };
 
   // Helper function to use mock data
-  const useMockData = () => {
+  const setMockData = () => {
     // Use mock data for demonstration
     setStats({
       totalBookings: 156,

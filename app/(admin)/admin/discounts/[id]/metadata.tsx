@@ -1,11 +1,5 @@
 import { Metadata } from "next";
 
-// Interface for discount API response
-interface Discount {
-  _id: string;
-  name: string;
-}
-
 // Interface for params
 interface MetadataParams {
   params: { id: string };
