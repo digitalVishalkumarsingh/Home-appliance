@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
@@ -7,7 +7,7 @@ import { ObjectId } from "mongodb";
 export async function POST(request: Request) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {
       return NextResponse.json(
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const { notificationIds, markAll } = await request.json();
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     let result;
 

@@ -21,10 +21,10 @@ interface AppliedDiscount extends Discount {
   originalPrice: number;
   discountedPrice: number;
   discountAmount: number;
-  formattedOriginalPrice: string;
-  formattedDiscountedPrice: string;
-  formattedDiscountAmount: string;
-  savings: string;
+  formattedOriginalPrice?: string;
+  formattedDiscountedPrice?: string;
+  formattedDiscountAmount?: string;
+  savings?: string;
 }
 
 interface DiscountSelectorProps {
@@ -35,6 +35,11 @@ interface DiscountSelectorProps {
   isServicePage?: boolean;
 }
 
+interface AuthState {
+  user: { role?: string } | null;
+  isAdmin: boolean;
+}
+
 export default function DiscountSelector({
   serviceId,
   categoryId,
@@ -42,7 +47,7 @@ export default function DiscountSelector({
   onDiscountApplied,
   isServicePage = false
 }: DiscountSelectorProps) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth() as AuthState;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableDiscounts, setAvailableDiscounts] = useState<Discount[]>([]);
@@ -50,12 +55,14 @@ export default function DiscountSelector({
   const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
   const [showDiscounts, setShowDiscounts] = useState(false);
 
+  // Normalize originalPrice to number
+  const normalizedPrice = typeof originalPrice === 'string'
+    ? parseFloat(originalPrice.replace(/[^0-9.]/g, ''))
+    : originalPrice;
+
   // Fetch available discounts
   useEffect(() => {
-    // Skip for admin users
-    if (isAdmin) {
-      return;
-    }
+    if (isAdmin) return; // Skip for admin users
 
     const fetchDiscounts = async () => {
       try {
@@ -69,7 +76,6 @@ export default function DiscountSelector({
 
         const response = await fetch(url);
 
-        // Handle 404 errors gracefully
         if (response.status === 404) {
           console.log(`No discounts found for category: ${categoryId}`);
           setAvailableDiscounts([]);
@@ -88,9 +94,6 @@ export default function DiscountSelector({
 
         if (data.success && data.discounts) {
           setAvailableDiscounts(data.discounts);
-
-          // If there's only one discount and we're on a service page (not in booking flow),
-          // automatically select it to show the user
           if (data.discounts.length === 1 && !onDiscountApplied) {
             setSelectedDiscount(data.discounts[0]);
           }
@@ -98,7 +101,6 @@ export default function DiscountSelector({
           setAvailableDiscounts([]);
         }
       } catch (error) {
-        // Log error but don't show to user
         console.warn('Warning: Error fetching discounts:', error);
         setAvailableDiscounts([]);
       } finally {
@@ -126,7 +128,7 @@ export default function DiscountSelector({
           discountId: discount._id,
           serviceId,
           categoryId,
-          originalPrice,
+          originalPrice: normalizedPrice,
         }),
       });
 
@@ -178,10 +180,7 @@ export default function DiscountSelector({
 
   // Auto-apply discount for service page if there's only one available
   useEffect(() => {
-    // Skip for admin users
-    if (isAdmin) {
-      return;
-    }
+    if (isAdmin) return; // Skip for admin users
 
     if (isServicePage && selectedDiscount && !appliedDiscount) {
       applyDiscount(selectedDiscount);
@@ -192,13 +191,13 @@ export default function DiscountSelector({
   if (appliedDiscount && isServicePage) {
     return (
       <div className="mt-4 mb-6">
-        <div className="p-3 bg-green-50 border border-green-100 rounded-md">
+        <div className="p-3 bg-green-50 border border-green-100 rounded-lg">
           <div className="flex items-center">
-            <FaTag className="text-green-500 mr-2" />
+            <FaTag className="text-green-500 mr-2" aria-hidden="true" />
             <div>
               <p className="text-sm font-medium text-green-800">{appliedDiscount.name}</p>
               <p className="text-xs text-green-700">
-                {appliedDiscount.savings} - You pay {appliedDiscount.formattedDiscountedPrice} instead of {appliedDiscount.formattedOriginalPrice}
+                {appliedDiscount.savings || ''} - You pay {appliedDiscount.formattedDiscountedPrice || ''} instead of {appliedDiscount.formattedOriginalPrice || ''}
               </p>
             </div>
           </div>
@@ -217,30 +216,34 @@ export default function DiscountSelector({
     return (
       <div className="mt-4 mb-6">
         {loading ? (
-          <div className="p-3 bg-blue-50 border border-blue-100 rounded-md">
+          <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
             <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2" aria-hidden="true"></div>
               <p className="text-sm text-blue-700">Checking for available offers...</p>
             </div>
           </div>
         ) : appliedDiscount ? (
-          <div className="p-3 bg-green-50 border border-green-100 rounded-md">
+          <div className="p-3 bg-green-50 border border-green-100 rounded-lg">
             <div className="flex items-center">
-              <FaTag className="text-green-500 mr-2" />
+              <FaTag className="text-green-500 mr-2" aria-hidden="true" />
               <div>
                 <p className="text-sm font-medium text-green-800">{appliedDiscount.name}</p>
                 <p className="text-xs text-green-700">
-                  {appliedDiscount.savings} - You pay {appliedDiscount.formattedDiscountedPrice} instead of {appliedDiscount.formattedOriginalPrice}
+                  {appliedDiscount.savings || ''} - You pay {appliedDiscount.formattedDiscountedPrice || ''} instead of {appliedDiscount.formattedOriginalPrice || ''}
                 </p>
               </div>
             </div>
           </div>
         ) : availableDiscounts.length > 0 ? (
-          <div className="p-3 bg-blue-50 border border-blue-100 rounded-md cursor-pointer"
-               onClick={() => applyDiscount(availableDiscounts[0])}>
+          <div
+            className="p-3 bg-blue-50 border border-blue-100 rounded-lg cursor-pointer transition-colors"
+            onClick={() => applyDiscount(availableDiscounts[0])}
+            role="button"
+            tabIndex={0}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <FaTag className="text-blue-500 mr-2" />
+                <FaTag className="text-blue-500 mr-2" aria-hidden="true" />
                 <div>
                   <p className="text-sm font-medium text-blue-800">{availableDiscounts[0].name}</p>
                   <p className="text-xs text-blue-700">
@@ -250,15 +253,18 @@ export default function DiscountSelector({
                   </p>
                 </div>
               </div>
-              <button className="text-xs font-medium text-blue-700 hover:text-blue-900">
+              <button
+                className="text-xs font-medium text-blue-700 hover:text-blue-900"
+                aria-label={`Apply ${availableDiscounts[0].name} discount`}
+              >
                 APPLY
               </button>
             </div>
           </div>
         ) : (
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
             <div className="flex items-center">
-              <FaInfoCircle className="text-gray-500 mr-2" />
+              <FaInfoCircle className="text-gray-500 mr-2" aria-hidden="true" />
               <p className="text-sm text-gray-700">No offers available for this service at the moment.</p>
             </div>
           </div>
@@ -273,7 +279,7 @@ export default function DiscountSelector({
       {/* Discount Section Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center">
-          <FaTag className="text-green-500 mr-2" />
+          <FaTag className="text-green-500 mr-2" aria-hidden="true" />
           <h3 className="text-lg font-medium text-gray-900">Available Offers</h3>
         </div>
 
@@ -282,14 +288,16 @@ export default function DiscountSelector({
             onClick={removeDiscount}
             className="text-sm text-red-600 hover:text-red-800 flex items-center"
             disabled={loading}
+            aria-label="Remove applied discount"
           >
-            <FaTimes className="mr-1" /> Remove
+            <FaTimes className="mr-1" aria-hidden="true" /> Remove
           </button>
         ) : (
           <button
             onClick={() => setShowDiscounts(!showDiscounts)}
             className="text-sm text-blue-600 hover:text-blue-800"
             disabled={loading}
+            aria-label={showDiscounts ? 'Hide available offers' : 'View available offers'}
           >
             {showDiscounts ? 'Hide Offers' : 'View Offers'}
           </button>
@@ -298,9 +306,12 @@ export default function DiscountSelector({
 
       {/* Error Message */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+        <div
+          className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+          role="alert"
+        >
           <div className="flex items-center">
-            <FaInfoCircle className="mr-2 flex-shrink-0" />
+            <FaInfoCircle className="mr-2 flex-shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
         </div>
@@ -316,24 +327,24 @@ export default function DiscountSelector({
           <div className="flex items-start">
             <div className="bg-green-100 p-2 rounded-full mr-3">
               {appliedDiscount.discountType === 'percentage' ? (
-                <FaPercent className="text-green-600 h-5 w-5" />
+                <FaPercent className="text-green-600 h-5 w-5" aria-hidden="true" />
               ) : (
-                <FaRupeeSign className="text-green-600 h-5 w-5" />
+                <FaRupeeSign className="text-green-600 h-5 w-5" aria-hidden="true" />
               )}
             </div>
             <div className="flex-1">
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="font-medium text-green-800">{appliedDiscount.name}</h4>
-                  <p className="text-sm text-green-700 mt-1">{appliedDiscount.savings} applied</p>
+                  <p className="text-sm text-green-700 mt-1">{appliedDiscount.savings || ''} applied</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm text-gray-500 line-through">{appliedDiscount.formattedOriginalPrice}</div>
-                  <div className="text-lg font-bold text-green-700">{appliedDiscount.formattedDiscountedPrice}</div>
+                  <div className="text-sm text-gray-500 line-through">{appliedDiscount.formattedOriginalPrice || ''}</div>
+                  <div className="text-lg font-bold text-green-700">{appliedDiscount.formattedDiscountedPrice || ''}</div>
                 </div>
               </div>
               <div className="mt-2 text-sm text-green-600">
-                You saved {appliedDiscount.formattedDiscountAmount}
+                You saved {appliedDiscount.formattedDiscountAmount || ''}
               </div>
             </div>
           </div>
@@ -352,7 +363,7 @@ export default function DiscountSelector({
           >
             {loading ? (
               <div className="p-4 text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mx-auto" aria-hidden="true"></div>
                 <p className="mt-2 text-sm text-gray-600">Loading available offers...</p>
               </div>
             ) : (
@@ -360,15 +371,17 @@ export default function DiscountSelector({
                 {availableDiscounts.map((discount) => (
                   <div
                     key={discount._id}
-                    className="p-4 hover:bg-gray-50 cursor-pointer"
+                    className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
                     onClick={() => applyDiscount(discount)}
+                    role="button"
+                    tabIndex={0}
                   >
                     <div className="flex items-start">
                       <div className="bg-blue-100 p-2 rounded-full mr-3">
                         {discount.discountType === 'percentage' ? (
-                          <FaPercent className="text-blue-600 h-5 w-5" />
+                          <FaPercent className="text-blue-600 h-5 w-5" aria-hidden="true" />
                         ) : (
-                          <FaRupeeSign className="text-blue-600 h-5 w-5" />
+                          <FaRupeeSign className="text-blue-600 h-5 w-5" aria-hidden="true" />
                         )}
                       </div>
                       <div className="flex-1">
@@ -386,7 +399,10 @@ export default function DiscountSelector({
                           Valid till {formatDate(discount.endDate)}
                         </p>
                       </div>
-                      <button className="ml-2 text-blue-600 hover:text-blue-800 font-medium text-sm">
+                      <button
+                        className="ml-2 text-blue-600 hover:text-blue-800 font-medium text-sm"
+                        aria-label={`Apply ${discount.name} discount`}
+                      >
                         APPLY
                       </button>
                     </div>

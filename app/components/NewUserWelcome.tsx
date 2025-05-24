@@ -33,8 +33,8 @@ export default function NewUserWelcome() {
     // Check if this is the first login after registration
     const isFirstLogin = localStorage.getItem("isFirstLogin") !== "false";
 
-    // If user is logged in, is not an admin, and this is their first login, show the welcome message
-    if (user && !user.role?.includes("admin") && isFirstLogin) {
+    // If user is logged in, is a regular user (not admin or technician), and this is their first login, show the welcome message
+    if (user && !user.role?.includes("admin") && user.role !== "technician" && isFirstLogin) {
       // Mark that the user has seen the welcome message
       localStorage.setItem("isFirstLogin", "false");
 

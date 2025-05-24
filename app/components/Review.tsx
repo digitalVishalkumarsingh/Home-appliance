@@ -31,7 +31,7 @@ const ReviewCarousel = () => {
   };
 
   return (
-    <div className="flex flex-col items-center w-full max-w-4xl mx-auto py-8">
+    <div className="flex flex-col items-center w-full max-w-4xl mx-auto py-4 mt-4">
       <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">
         Customer Reviews
       </h2>
@@ -52,13 +52,13 @@ const ReviewCarousel = () => {
             onClick={scrollLeft}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
-           
+            ← Previous
           </button>
           <button
             onClick={scrollRight}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
-        
+            Next →
           </button>
         </div>
       </div>

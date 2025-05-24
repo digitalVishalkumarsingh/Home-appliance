@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ButtonHTMLAttributes, ReactNode, forwardRef } from "react";
@@ -13,6 +14,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
   fullWidth?: boolean;
+  toggleSwitch?: boolean; // New prop for toggle switch (used in AvailabilityToggle)
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -28,21 +30,22 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       rightIcon,
       fullWidth = false,
       disabled,
+      toggleSwitch = false,
       ...props
     },
     ref
   ) => {
     // Base styles
-    const baseStyles = "inline-flex items-center justify-center font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors";
+    const baseStyles = "inline-flex items-center justify-center font-medium rounded-md";
 
-    // Variant styles
+    // Variant styles (no hover or focus effects)
     const variantStyles = {
-      primary: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 border border-transparent",
-      secondary: "bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-500 border border-transparent",
-      outline: "bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500 border border-gray-300",
-      ghost: "bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500 border border-transparent",
-      danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 border border-transparent",
-      success: "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 border border-transparent",
+      primary: "bg-blue-600 text-white border border-transparent",
+      secondary: "bg-gray-200 text-gray-800 border border-transparent",
+      outline: "bg-transparent text-gray-700 border border-gray-300",
+      ghost: "bg-transparent text-gray-700 border border-transparent",
+      danger: "bg-red-600 text-white border border-transparent",
+      success: "bg-green-600 text-white border border-transparent",
     };
 
     // Size styles
@@ -58,6 +61,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     // Full width style
     const widthStyle = fullWidth ? "w-full" : "";
 
+    // Toggle switch styles (for AvailabilityToggle)
+    const toggleSwitchStyles = toggleSwitch
+      ? "flex items-center space-x-2 rounded-full px-4 py-2 shadow-sm"
+      : "";
+
     return (
       <button
         ref={ref}
@@ -67,6 +75,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           sizeStyles[size],
           (disabled || isLoading) && disabledStyles,
           widthStyle,
+          toggleSwitchStyles,
           className
         )}
         disabled={disabled || isLoading}
@@ -76,6 +85,22 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           <>
             <FaSpinner className="animate-spin mr-2 -ml-1 h-4 w-4" />
             {loadingText || children}
+          </>
+        ) : toggleSwitch ? (
+          <>
+            <div className="relative w-12 h-6">
+              <div
+                className={`absolute inset-0 rounded-full ${
+                  variant === "success" ? "bg-green-300" : "bg-red-300"
+                }`}
+              ></div>
+              <div
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-300 ${
+                  variant === "success" ? "translate-x-6" : "translate-x-0.5"
+                }`}
+              ></div>
+            </div>
+            {children}
           </>
         ) : (
           <>

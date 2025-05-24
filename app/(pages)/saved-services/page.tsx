@@ -20,7 +20,7 @@ interface Service {
 }
 
 export default function SavedServicesPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, syncTokenFromCookies } = useAuth();
   const router = useRouter();
   const [savedServices, setSavedServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,11 +28,29 @@ export default function SavedServicesPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!authLoading && !isAuthenticated) {
-      toast.error('Please log in to view your saved services');
-      router.push('/login');
+    console.log('SavedServices - Auth state:', { authLoading, isAuthenticated, hasUser: !!user });
+
+    // Wait for auth to finish loading
+    if (authLoading) {
+      console.log('SavedServices - Still loading, waiting...');
       return;
+    }
+
+    // If not authenticated, try to sync token from cookies first
+    if (!isAuthenticated || !user) {
+      console.log('SavedServices - Not authenticated, trying to sync token from cookies');
+      const hasToken = syncTokenFromCookies();
+
+      if (!hasToken) {
+        console.log('SavedServices - No token found, redirecting to login');
+        toast.error('Please log in to view your saved services');
+        router.push('/login');
+        return;
+      } else {
+        console.log('SavedServices - Token found, waiting for authentication to complete');
+        // Token was found, wait for the auth hook to process it
+        return;
+      }
     }
 
     // Fetch saved services
@@ -41,9 +59,25 @@ export default function SavedServicesPage() {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch('/api/user/saved-services');
+        // Get token from localStorage
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        const response = await fetch('/api/user/saved-services', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            toast.error('Session expired. Please log in again.');
+            router.push('/login');
+            return;
+          }
           throw new Error('Failed to fetch saved services');
         }
 
@@ -62,10 +96,9 @@ export default function SavedServicesPage() {
       }
     };
 
-    if (isAuthenticated && !authLoading) {
-      fetchSavedServices();
-    }
-  }, [isAuthenticated, authLoading, router]);
+    console.log('SavedServices - User authenticated, fetching saved services');
+    fetchSavedServices();
+  }, [isAuthenticated, authLoading, user, router, syncTokenFromCookies]);
 
   // Filter services based on search query
   const filteredServices = savedServices.filter(service =>

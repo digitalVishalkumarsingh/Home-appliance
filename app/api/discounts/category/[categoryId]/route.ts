@@ -20,7 +20,7 @@ export async function GET(
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Find the category
     let category;

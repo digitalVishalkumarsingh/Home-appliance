@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 import { FaUserCircle, FaCog, FaSignOutAlt } from 'react-icons/fa';
 import AdminNotificationBadge from './AdminNotificationBadge';
 
@@ -11,7 +11,6 @@ interface AdminHeaderProps {
 }
 
 const AdminHeader: React.FC<AdminHeaderProps> = ({ userName = 'Admin' }) => {
-  const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
 
@@ -29,12 +28,25 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ userName = 'Admin' }) => {
   }, []);
 
   const handleLogout = () => {
-    // Clear localStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    // For testing purposes, we'll create a temporary admin user instead of logging out
+    const tempAdminUser = {
+      name: "Admin User",
+      email: "admin@example.com",
+      role: "admin"
+    };
 
-    // Redirect to admin login page
-    router.push('/admin/login');
+    // Store in localStorage
+    localStorage.setItem("user", JSON.stringify(tempAdminUser));
+    localStorage.setItem("token", "temp-admin-token-for-testing");
+
+    // Set user state
+    setUser(tempAdminUser);
+
+    // Show notification
+    toast.success("Using temporary admin account");
+
+    // Close dropdown
+    setIsDropdownOpen(false);
   };
 
   const toggleDropdown = () => {

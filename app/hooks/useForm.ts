@@ -1,10 +1,14 @@
+
 "use client";
 
 import { useState, useCallback, ChangeEvent, FormEvent } from "react";
+import { toast } from "react-hot-toast";
+import { logger } from "../config/logger";
+import  useApi  from "./useApi";
 
 interface FormOptions<T> {
   initialValues: T;
-  onSubmit: (values: T) => void | Promise<void>;
+  onSubmit: (values: T, api: ReturnType<typeof useApi>) => void | Promise<void>;
   validate?: (values: T) => Partial<Record<keyof T, string>>;
 }
 
@@ -14,6 +18,7 @@ interface FormState<T> {
   touched: Partial<Record<keyof T, boolean>>;
   isSubmitting: boolean;
   isValid: boolean;
+  apiError: "network" | "auth" | null;
 }
 
 export function useForm<T extends Record<string, any>>({
@@ -27,23 +32,34 @@ export function useForm<T extends Record<string, any>>({
     touched: {},
     isSubmitting: false,
     isValid: true,
+    apiError: null,
   });
 
-  // Validate form values
+  const api = useApi({
+    url: "", // URL set dynamically in onSubmit
+    method: "POST",
+    withAuth: true,
+    showSuccessToast: false,
+    showErrorToast: false,
+    errorMessage: "Form submission failed",
+  });
+
   const validateForm = useCallback(
     (values: T): Partial<Record<keyof T, string>> => {
       if (!validate) return {};
-      return validate(values);
+      try {
+        return validate(values);
+      } catch (error) {
+        logger.error("Validation error", { error });
+        return {};
+      }
     },
     [validate]
   );
 
-  // Handle input change
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       const { name, value, type } = e.target;
-      
-      // Handle different input types
       let processedValue: any = value;
       if (type === "number") {
         processedValue = value === "" ? "" : Number(value);
@@ -54,64 +70,59 @@ export function useForm<T extends Record<string, any>>({
       setFormState((prev) => {
         const newValues = { ...prev.values, [name]: processedValue };
         const errors = validateForm(newValues);
-        
         return {
           ...prev,
           values: newValues,
           errors,
           touched: { ...prev.touched, [name]: true },
           isValid: Object.keys(errors).length === 0,
+          apiError: null,
         };
       });
     },
     [validateForm]
   );
 
-  // Set a specific field value programmatically
   const setFieldValue = useCallback(
     (name: keyof T, value: any) => {
       setFormState((prev) => {
         const newValues = { ...prev.values, [name]: value };
         const errors = validateForm(newValues);
-        
         return {
           ...prev,
           values: newValues,
           errors,
           touched: { ...prev.touched, [name]: true },
           isValid: Object.keys(errors).length === 0,
+          apiError: null,
         };
       });
     },
     [validateForm]
   );
 
-  // Set multiple field values at once
   const setValues = useCallback(
     (newValues: Partial<T>) => {
       setFormState((prev) => {
         const updatedValues = { ...prev.values, ...newValues };
         const errors = validateForm(updatedValues);
-        
-        // Mark all changed fields as touched
         const newTouched = { ...prev.touched };
         Object.keys(newValues).forEach((key) => {
           newTouched[key as keyof T] = true;
         });
-        
         return {
           ...prev,
           values: updatedValues,
           errors,
           touched: newTouched,
           isValid: Object.keys(errors).length === 0,
+          apiError: null,
         };
       });
     },
     [validateForm]
   );
 
-  // Mark a field as touched
   const setFieldTouched = useCallback((name: keyof T, isTouched = true) => {
     setFormState((prev) => ({
       ...prev,
@@ -119,35 +130,36 @@ export function useForm<T extends Record<string, any>>({
     }));
   }, []);
 
-  // Handle form submission
   const handleSubmit = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
-      
-      // Validate all fields
       const errors = validateForm(formState.values);
       const isValid = Object.keys(errors).length === 0;
-      
-      // Mark all fields as touched
       const touched: Partial<Record<keyof T, boolean>> = {};
       Object.keys(formState.values).forEach((key) => {
         touched[key as keyof T] = true;
       });
-      
+
       setFormState((prev) => ({
         ...prev,
         errors,
         touched,
         isValid,
         isSubmitting: isValid,
+        apiError: null,
       }));
-      
-      // Only submit if valid
+
       if (isValid) {
         try {
-          await onSubmit(formState.values);
+          await onSubmit(formState.values, api);
+          toast.success("Form submitted successfully");
         } catch (error) {
-          console.error("Form submission error:", error);
+          const errorMessage = error instanceof Error ? error.message : "Unknown submission error";
+          logger.error("Form submission error", { error: errorMessage });
+          setFormState((prev) => ({
+            ...prev,
+            apiError: errorMessage.includes("token") || errorMessage.includes("401") ? "auth" : "network",
+          }));
         } finally {
           setFormState((prev) => ({
             ...prev,
@@ -156,10 +168,9 @@ export function useForm<T extends Record<string, any>>({
         }
       }
     },
-    [formState.values, onSubmit, validateForm]
+    [formState.values, onSubmit, validateForm, api]
   );
 
-  // Reset form to initial state
   const resetForm = useCallback(() => {
     setFormState({
       values: initialValues,
@@ -167,8 +178,9 @@ export function useForm<T extends Record<string, any>>({
       touched: {},
       isSubmitting: false,
       isValid: true,
+      apiError: null,
     });
-  }, [initialValues]);
+  }, [initialValues, api]);
 
   return {
     values: formState.values,
@@ -176,6 +188,7 @@ export function useForm<T extends Record<string, any>>({
     touched: formState.touched,
     isSubmitting: formState.isSubmitting,
     isValid: formState.isValid,
+    apiError: formState.apiError,
     handleChange,
     handleSubmit,
     setFieldValue,

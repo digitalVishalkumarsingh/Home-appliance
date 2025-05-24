@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get current date
     const now = new Date();
@@ -31,14 +31,23 @@ export async function GET(request: Request) {
 
     // Find bookings for today and tomorrow that haven't received reminders in the last 12 hours
     const bookings = await db.collection('bookings').find({
-      $or: [
-        { bookingDate: todayStr },
-        { bookingDate: tomorrowStr }
-      ],
       bookingStatus: { $nin: ['cancelled', 'completed'] },
       $or: [
-        { lastReminderSent: { $exists: false } },
-        { lastReminderSent: { $lt: new Date(now.getTime() - 12 * 60 * 60 * 1000) } }
+        // Bookings for today or tomorrow AND haven't received reminders in the last 12 hours
+        {
+          bookingDate: todayStr,
+          $or: [
+            { lastReminderSent: { $exists: false } },
+            { lastReminderSent: { $lt: new Date(now.getTime() - 12 * 60 * 60 * 1000) } }
+          ]
+        },
+        {
+          bookingDate: tomorrowStr,
+          $or: [
+            { lastReminderSent: { $exists: false } },
+            { lastReminderSent: { $lt: new Date(now.getTime() - 12 * 60 * 60 * 1000) } }
+          ]
+        }
       ]
     }).toArray();
 

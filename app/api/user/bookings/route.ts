@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
@@ -7,7 +7,10 @@ import { ObjectId } from "mongodb";
 export async function GET(request: Request) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(request);
+    const nextRequest = request instanceof Request && !(request instanceof NextRequest)
+      ? new NextRequest(request.url, { headers: request.headers, method: request.method, body: (request as any).body })
+      : (request as NextRequest);
+    const token = getTokenFromRequest(nextRequest);
 
     if (!token) {
       return NextResponse.json(
@@ -26,11 +29,12 @@ export async function GET(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get user details to match by email and phone as well
+    const userIdStr = typeof decoded.userId === "string" ? decoded.userId : String(decoded.userId);
     const user = await db.collection("users").findOne(
-      { _id: new ObjectId(decoded.userId) },
+      { _id: new ObjectId(userIdStr) },
       { projection: { email: 1, phone: 1 } }
     );
 

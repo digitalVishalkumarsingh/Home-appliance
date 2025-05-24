@@ -19,7 +19,7 @@ interface VerifyPaymentRequest {
 export async function POST(request: Request) {
   try {
     // Extract token from request
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new (require("next/server").NextRequest)(request));
     if (!token) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: No token provided" },
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     }
 
     // Verify token
-    const decoded = verifyToken(token) as JwtPayload;
+    const decoded = (await verifyToken(token)) as JwtPayload;
     if (!decoded || !decoded.userId) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: Invalid token" },
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Find payment by Razorpay order ID
     const payment = await db.collection("payments").findOne({ razorpayOrderId });

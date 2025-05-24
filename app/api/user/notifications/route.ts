@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
@@ -7,7 +7,7 @@ import { ObjectId } from "mongodb";
 export async function GET(request: Request) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {
       return NextResponse.json(
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || typeof decoded === 'string' || !decoded.userId) {
       return NextResponse.json(
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get URL parameters
     const { searchParams } = new URL(request.url);
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {
       return NextResponse.json(
@@ -93,7 +93,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || typeof decoded === 'string' || !decoded.userId) {
       return NextResponse.json(
@@ -106,7 +106,7 @@ export async function PUT(request: Request) {
     const { notificationIds, markAll } = await request.json();
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     let result;
 
@@ -159,7 +159,7 @@ export async function PUT(request: Request) {
 export async function POST(request: Request) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {
       return NextResponse.json(
@@ -168,7 +168,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || typeof decoded === 'string' || !decoded.userId) {
       return NextResponse.json(
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Create notification
     const notification = {

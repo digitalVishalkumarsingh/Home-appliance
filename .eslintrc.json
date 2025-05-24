@@ -1,13 +1,25 @@
 {
-  "extends": "next/core-web-vitals",
+  "extends": [
+    "next/core-web-vitals",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended"
+  ],
   "rules": {
-    "react/no-unescaped-entities": "off",
-    "@typescript-eslint/no-explicit-any": "off",
-    "@typescript-eslint/no-unused-vars": "off",
-    "@next/next/no-img-element": "off",
-    "prefer-const": "off",
-    "@typescript-eslint/no-require-imports": "off",
-    "@typescript-eslint/ban-ts-comment": "off",
-    "react-hooks/exhaustive-deps": "off"
+    "react/no-unescaped-entities": "warn",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "@next/next/no-img-element": "warn",
+    "prefer-const": "warn",
+    "@typescript-eslint/no-require-imports": "error",
+    "@typescript-eslint/ban-ts-comment": ["warn", { "ts-ignore": "allow-with-description" }],
+    "react-hooks/exhaustive-deps": "warn",
+    "react/prop-types": "off",
+    "react/react-in-jsx-scope": "off"
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
   }
 }

@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get payment details from database
     const payment = await db.collection("payments").findOne({ razorpayOrderId: orderId });

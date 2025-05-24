@@ -5,14 +5,14 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
-import { 
-  FaCalendarAlt, 
-  FaClock, 
-  FaMapMarkerAlt, 
-  FaRupeeSign, 
-  FaSpinner, 
-  FaArrowLeft, 
-  FaPrint, 
+import {
+  FaCalendarAlt,
+  FaClock,
+  FaMapMarkerAlt,
+  FaRupeeSign,
+  FaSpinner,
+  FaArrowLeft,
+
   FaTag,
   FaCheckCircle,
   FaTimesCircle,
@@ -20,6 +20,7 @@ import {
 } from 'react-icons/fa';
 import BookingManagement from '@/app/components/BookingManagement';
 import SimplePrintButton from '@/app/components/SimplePrintButton';
+import RatingForm from '@/app/components/RatingForm';
 
 interface Discount {
   _id: string;
@@ -71,19 +72,34 @@ interface Booking {
   bookingId?: string;
   orderId?: string;
   userId?: string;
-  customerName: string;
+  customerName?: string;
+  name?: string;
   customerEmail?: string;
+  email?: string;
   customerPhone?: string;
+  phone?: string;
   service: string;
-  date: string;
+  serviceName?: string;
+  date?: string;
+  bookingDate?: string;
   time?: string;
+  bookingTime?: string;
   address?: string;
   customerAddress?: string;
   status: string;
+  bookingStatus?: string;
   paymentStatus: string;
   amount: number;
   createdAt: string;
-  notes?: string;
+  notes?: {
+    service?: string;
+    customerName?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    customerAddress?: string;
+    bookingDate?: string;
+    bookingTime?: string;
+  };
   serviceDetails?: string;
   payment?: Payment;
   appliedDiscount?: AppliedDiscount;
@@ -145,7 +161,7 @@ export default function BookingDetailsPage() {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
     if (!dateString) return 'Not scheduled';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', {
@@ -186,6 +202,14 @@ export default function BookingDetailsPage() {
 
   const getOrderId = (booking: Booking) => {
     return booking.orderId || booking.payment?.orderId || '';
+  };
+
+  const getValidStatus = (status: string): 'pending' | 'confirmed' | 'completed' | 'cancelled' => {
+    const statusLower = status.toLowerCase();
+    if (['pending', 'confirmed', 'completed', 'cancelled'].includes(statusLower)) {
+      return statusLower as 'pending' | 'confirmed' | 'completed' | 'cancelled';
+    }
+    return 'pending'; // Default fallback
   };
 
   if (loading) {
@@ -337,8 +361,8 @@ export default function BookingDetailsPage() {
                         <div>
                           <p className="text-sm font-medium text-green-800">{booking.appliedDiscount.discountName}</p>
                           <p className="text-xs text-green-700">
-                            {booking.appliedDiscount.discountType === 'percentage' 
-                              ? `${booking.appliedDiscount.discountValue}% off` 
+                            {booking.appliedDiscount.discountType === 'percentage'
+                              ? `${booking.appliedDiscount.discountValue}% off`
                               : `₹${booking.appliedDiscount.discountValue} off`}
                             {' - '}
                             You saved {formatAmount(booking.appliedDiscount.originalAmount - booking.appliedDiscount.discountedAmount)}
@@ -358,13 +382,13 @@ export default function BookingDetailsPage() {
                     Available Offers
                   </dt>
                   <dd className="mt-1">
-                    <button 
+                    <button
                       onClick={() => setShowOffers(!showOffers)}
                       className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
                     >
                       {showOffers ? 'Hide Offers' : `Show ${booking.availableOffers.length} Available Offers`}
                     </button>
-                    
+
                     {showOffers && (
                       <div className="mt-2 space-y-2">
                         {booking.availableOffers.map((offer) => (
@@ -375,8 +399,8 @@ export default function BookingDetailsPage() {
                                 <div>
                                   <p className="text-sm font-medium text-blue-800">{offer.name}</p>
                                   <p className="text-xs text-blue-700">
-                                    {offer.discountType === 'percentage' 
-                                      ? `${offer.discountValue}% off` 
+                                    {offer.discountType === 'percentage'
+                                      ? `${offer.discountValue}% off`
                                       : `₹${offer.discountValue} off`}
                                     {offer.minOrderValue ? ` on orders above ₹${offer.minOrderValue}` : ''}
                                   </p>
@@ -395,10 +419,10 @@ export default function BookingDetailsPage() {
               )}
 
               {/* Notes Section */}
-              {booking.notes && (
+              {booking.serviceDetails && (
                 <div className="sm:col-span-2">
                   <dt className="text-sm font-medium text-gray-500">Notes</dt>
-                  <dd className="mt-1 text-sm text-gray-900 whitespace-pre-line">{booking.notes}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 whitespace-pre-line">{booking.serviceDetails}</dd>
                 </div>
               )}
             </dl>
@@ -413,7 +437,7 @@ export default function BookingDetailsPage() {
                 orderId={getOrderId(booking)}
                 currentDate={booking.date}
                 currentTime={booking.time || ''}
-                status={booking.status}
+                status={getValidStatus(booking.status)}
                 onRescheduleSuccess={() => {
                   toast.success('Your booking has been rescheduled');
                   fetchBookingDetails();
@@ -422,6 +446,17 @@ export default function BookingDetailsPage() {
                   toast.success('Your booking has been cancelled');
                   fetchBookingDetails();
                 }}
+              />
+            </div>
+          )}
+
+          {/* Rating Section - Only show for completed bookings */}
+          {booking.status.toLowerCase() === 'completed' && (
+            <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+              <h4 className="text-base font-medium text-gray-900 mb-4">Rate Your Experience</h4>
+              <RatingForm
+                bookingId={getBookingId(booking)}
+                onRatingSubmitted={fetchBookingDetails}
               />
             </div>
           )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   FaSearch,
@@ -13,10 +13,13 @@ import {
   FaSort,
   FaSortUp,
   FaSortDown,
-  FaEye
+  FaEye,
 } from "react-icons/fa";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import { debounce } from "lodash";
+import Pagination from "@/app/components/admin/Pagination";
 
 interface Customer {
   _id: string;
@@ -41,6 +44,7 @@ interface Pagination {
 }
 
 export default function CustomersPage() {
+  const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,76 +55,85 @@ export default function CustomersPage() {
     skip: 0,
     hasMore: false,
   });
-  const [sortField, setSortField] = useState<string>("createdAt");
+  const [sortField, setSortField] = useState<"name" | "email" | "createdAt">("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [activeTab, setActiveTab] = useState<"all" | "active" | "inactive">("all");
 
-  useEffect(() => {
-    fetchCustomers();
-  }, [pagination.skip, pagination.limit, sortField, sortOrder, activeTab]);
+  const fetchCustomers = useCallback(
+    async (search: string = searchTerm) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const fetchCustomers = async (search: string = searchTerm) => {
-    try {
-      setLoading(true);
-      setError(null);
+        const token = localStorage.getItem("token");
+        if (!token) {
+          toast.error("Please log in to view customers");
+          router.push("/admin/login");
+          return;
+        }
 
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setError("Authentication token not found");
-        return;
+        const queryParams = new URLSearchParams({
+          limit: pagination.limit.toString(),
+          skip: pagination.skip.toString(),
+          sort: sortField,
+          order: sortOrder,
+          ...(search && { search }),
+        });
+
+        let endpoint = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/customers`;
+        if (activeTab === "active") {
+          endpoint = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/customers/active`;
+        } else if (activeTab === "inactive") {
+          endpoint = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/customers/inactive`;
+        }
+
+        const response = await fetch(`${endpoint}?${queryParams}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Failed to fetch customers: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success && Array.isArray(data.customers)) {
+          setCustomers(data.customers);
+          setPagination(data.pagination);
+        } else {
+          throw new Error(data.message || "Invalid response format");
+        }
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        setError(error instanceof Error ? error.message : "Failed to fetch customers");
+        toast.error(error instanceof Error ? error.message : "Failed to fetch customers");
+      } finally {
+        setLoading(false);
       }
+    },
+    [pagination.skip, pagination.limit, sortField, sortOrder, activeTab, searchTerm, router]
+  );
 
-      const queryParams = new URLSearchParams({
-        limit: pagination.limit.toString(),
-        skip: pagination.skip.toString(),
-        sort: sortField,
-        order: sortOrder,
-        ...(search && { search }),
-      });
+  // Debounced search handler
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setPagination((prev) => ({ ...prev, skip: 0 }));
+        fetchCustomers(value);
+      }, 500),
+    [fetchCustomers]
+  );
 
-      // Determine which API endpoint to use based on the active tab
-      let endpoint = '/api/admin/customers';
-      if (activeTab === 'active') {
-        endpoint = '/api/admin/customers/active';
-      } else if (activeTab === 'inactive') {
-        endpoint = '/api/admin/customers/inactive';
-      }
-
-      const response = await fetch(`${endpoint}?${queryParams}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to fetch customers");
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setCustomers(data.customers);
-        setPagination(data.pagination);
-      } else {
-        throw new Error(data.message || "Failed to fetch customers");
-      }
-    } catch (error: any) {
-      console.error("Error fetching customers:", error);
-      setError(error.message || "Failed to fetch customers");
-      toast.error(error.message || "Failed to fetch customers");
-    } finally {
-      setLoading(false);
-    }
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    debouncedSearch(value);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPagination({ ...pagination, skip: 0 }); // Reset to first page
-    fetchCustomers(searchTerm);
-  };
-
-  const handleSort = (field: string) => {
+  const handleSort = (field: typeof sortField) => {
     if (field === sortField) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
@@ -129,7 +142,7 @@ export default function CustomersPage() {
     }
   };
 
-  const getSortIcon = (field: string) => {
+  const getSortIcon = (field: typeof sortField) => {
     if (field !== sortField) return <FaSort className="ml-1 text-gray-400" />;
     return sortOrder === "asc" ? (
       <FaSortUp className="ml-1 text-blue-500" />
@@ -138,24 +151,67 @@ export default function CustomersPage() {
     );
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  const formatDate = useMemo(
+    () => (dateString: string | null) => {
+      if (!dateString) return "N/A";
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    },
+    []
+  );
+
+  const formatCurrency = useMemo(
+    () => (amount: number) =>
+      new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0 }).format(amount),
+    []
+  );
+
+  useEffect(() => {
+    fetchCustomers();
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [fetchCustomers, debouncedSearch]);
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg
+              className="h-5 w-5 text-red-400"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">Error</h3>
+            <div className="mt-2 text-sm text-red-700">
+              <p>{error}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Customers</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage all customer accounts
-          </p>
+          <p className="mt-1 text-sm text-gray-500">Manage all customer accounts</p>
         </div>
       </div>
 
@@ -165,7 +221,7 @@ export default function CustomersPage() {
           <button
             onClick={() => {
               setActiveTab("all");
-              setPagination({ ...pagination, skip: 0 }); // Reset pagination
+              setPagination((prev) => ({ ...prev, skip: 0 }));
             }}
             className={`${
               activeTab === "all"
@@ -178,7 +234,7 @@ export default function CustomersPage() {
           <button
             onClick={() => {
               setActiveTab("active");
-              setPagination({ ...pagination, skip: 0 }); // Reset pagination
+              setPagination((prev) => ({ ...prev, skip: 0 }));
             }}
             className={`${
               activeTab === "active"
@@ -191,7 +247,7 @@ export default function CustomersPage() {
           <button
             onClick={() => {
               setActiveTab("inactive");
-              setPagination({ ...pagination, skip: 0 }); // Reset pagination
+              setPagination((prev) => ({ ...prev, skip: 0 }));
             }}
             className={`${
               activeTab === "inactive"
@@ -204,28 +260,20 @@ export default function CustomersPage() {
         </nav>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search */}
       <div className="bg-white shadow rounded-lg p-4">
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-grow">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <FaSearch className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search by name, email or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
+        <div className="relative flex-grow">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <FaSearch className="h-5 w-5 text-gray-400" />
           </div>
-          <button
-            type="submit"
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Search
-          </button>
-        </form>
+          <input
+            type="text"
+            placeholder="Search by name, email, or phone..."
+            value={searchTerm}
+            onChange={handleSearch}
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+        </div>
       </div>
 
       {/* Customers Table */}
@@ -234,8 +282,6 @@ export default function CustomersPage() {
           <div className="flex justify-center items-center p-8">
             <FaSpinner className="animate-spin h-8 w-8 text-blue-500" />
           </div>
-        ) : error ? (
-          <div className="p-4 text-center text-red-500">{error}</div>
         ) : customers.length === 0 ? (
           <div className="p-8 text-center">
             <FaUser className="mx-auto h-12 w-12 text-gray-400" />
@@ -336,20 +382,16 @@ export default function CustomersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{customer.stats.bookingCount}</div>
-                      <div className="text-sm text-gray-500">
-                        {customer.stats.completedBookingCount} completed
-                      </div>
+                      <div className="text-sm text-gray-500">{customer.stats.completedBookingCount} completed</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 flex items-center">
                         <FaRupeeSign className="mr-1 text-gray-500" />
-                        {customer.stats.totalSpent.toLocaleString()}
+                        {formatCurrency(customer.stats.totalSpent)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {customer.stats.lastBookingDate
-                        ? formatDate(customer.stats.lastBookingDate)
-                        : "Never"}
+                      {formatDate(customer.stats.lastBookingDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <Link
@@ -380,22 +422,14 @@ export default function CustomersPage() {
                 </p>
               </div>
               <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                  <button
-                    onClick={() => setPagination({ ...pagination, skip: Math.max(0, pagination.skip - pagination.limit) })}
-                    disabled={pagination.skip === 0}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setPagination({ ...pagination, skip: pagination.skip + pagination.limit })}
-                    disabled={!pagination.hasMore}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </nav>
+                <Pagination
+                  currentPage={Math.floor(pagination.skip / pagination.limit) + 1}
+                  totalPages={Math.ceil(pagination.total / pagination.limit)}
+                  onPageChange={(page) =>
+                    setPagination((prev) => ({ ...prev, skip: (page - 1) * prev.limit }))
+                  }
+                  maxPageButtons={5}
+                />
               </div>
             </div>
           </div>

@@ -5,7 +5,7 @@ import { connectToDatabase } from "@/app/lib/mongodb";
 export async function GET() {
   try {
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get current date
     const now = new Date().toISOString();

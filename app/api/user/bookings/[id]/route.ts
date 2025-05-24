@@ -4,8 +4,10 @@ import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
 
 // Get a specific booking for a user
+import type { NextRequest } from "next/server";
+
 export async function GET(
-  request: Request,
+  request: NextRequest,
   context: { params: { id: string } }
 ) {
   try {
@@ -33,11 +35,11 @@ export async function GET(
     const bookingId = params.id;
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get user details to match by email and phone as well
     const user = await db.collection("users").findOne(
-      { _id: new ObjectId(decoded.userId) },
+      { _id: new ObjectId(decoded.userId as string) },
       { projection: { email: 1, phone: 1 } }
     );
 

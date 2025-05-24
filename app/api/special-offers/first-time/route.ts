@@ -1,109 +1,117 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
-import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
+import { verifyToken, getTokenFromRequest, AuthError, JwtPayload } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
+import { logger } from "@/app/config/logger";
 
 // Check if a user is eligible for first-time booking discount
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    // Verify user authentication
-    const token = getTokenFromRequest(request);
-
-    if (!token) {
+    // Extract and verify token
+    let token: string;
+    try {
+      token = getTokenFromRequest(request);
+    } catch (error) {
+      logger.warn("Failed to extract token", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       return NextResponse.json(
         { success: false, message: "Authentication required" },
         { status: 401 }
       );
     }
 
-    const decoded = verifyToken(token);
-    if (!decoded) {
+    let decoded: JwtPayload;
+    try {
+      decoded = await verifyToken(token);
+    } catch (error) {
+      logger.error("Token verification failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        code: error instanceof AuthError ? error.code : "UNKNOWN",
+      });
       return NextResponse.json(
-        { success: false, message: "Invalid token" },
+        { success: false, message: "Invalid or expired token" },
         { status: 401 }
       );
     }
 
-    const userId = (decoded as { userId?: string }).userId;
+    const { userId, role } = decoded;
     if (!userId) {
+      logger.warn("User ID not found in token", { token });
       return NextResponse.json(
-        { success: false, message: "User ID not found in token" },
+        { success: false, message: "Invalid token payload" },
         { status: 400 }
       );
     }
 
     // Check if user is an admin
-    const userRole = (decoded as { role?: string }).role;
-    if (userRole === 'admin') {
+    if (role === "admin") {
+      logger.debug("Admin user checked for eligibility", { userId });
       return NextResponse.json({
         success: true,
         message: "Admin users are not eligible for special offers",
         isEligible: false,
-        offer: null
+        offer: null,
       });
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Check if user has any previous bookings
     const bookingsCount = await db.collection("bookings").countDocuments({
-      userId: userId,
-      status: { $ne: "cancelled" } // Don't count cancelled bookings
+      userId: new ObjectId(userId), // Convert to ObjectId for MongoDB query
+      status: { $ne: "cancelled" }, // Exclude cancelled bookings
     });
 
     // Get the first-time booking offer
+    const currentDate = new Date();
     const firstTimeOffer = await db.collection("specialOffers").findOne({
       type: "first-booking",
       isActive: true,
-      startDate: { $lte: new Date().toISOString() },
-      endDate: { $gte: new Date().toISOString() }
+      startDate: { $lte: currentDate },
+      endDate: { $gte: currentDate },
     });
 
-    // If no first-time offer is configured, create a default one
-    let offer = firstTimeOffer;
-    if (!offer) {
-      // Create a default first-time booking offer
-      const defaultOffer = {
-        title: "First-Time Booking Discount",
-        description: "Special discount for your first booking with us!",
-        type: "first-booking",
-        discountType: "percentage",
-        discountValue: 10, // 10% discount
-        code: "FIRSTBOOKING",
-        minOrderValue: 0,
-        maxDiscountAmount: 500, // Maximum discount of ₹500
-        isActive: true,
-        startDate: new Date(new Date().getFullYear(), 0, 1).toISOString(), // Jan 1 of current year
-        endDate: new Date(new Date().getFullYear() + 1, 11, 31).toISOString(), // Dec 31 of next year
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
+    // If no first-time offer exists, use a default (avoid auto-insertion)
+    const defaultOffer = {
+      title: "First-Time Booking Discount",
+      description: "Special discount for your first booking with us!",
+      type: "first-booking",
+      discountType: "percentage",
+      discountValue: 10, // 10% discount
+      code: "FIRSTBOOKING",
+      minOrderValue: 0,
+      maxDiscountAmount: 500, // Maximum discount of ₹500
+      isActive: true,
+      startDate: new Date(currentDate.getFullYear(), 0, 1),
+      endDate: new Date(currentDate.getFullYear() + 1, 11, 31),
+      createdAt: currentDate,
+      updatedAt: currentDate,
+    };
 
-      try {
-        // Try to insert the default offer
-        const result = await db.collection("specialOffers").insertOne(defaultOffer);
-        offer = {
-          ...defaultOffer,
-          _id: result.insertedId
-        };
-      } catch (error) {
-        console.error("Error creating default first-time booking offer:", error);
-        // Continue without creating a default offer
-      }
-    }
+    const offer = firstTimeOffer || defaultOffer;
 
     // Determine if user is eligible
     const isEligible = bookingsCount === 0;
+
+    logger.debug("First-time booking eligibility checked", {
+      userId,
+      bookingsCount,
+      isEligible,
+      offerId: firstTimeOffer?._id?.toString() || "default",
+    });
 
     return NextResponse.json({
       success: true,
       isEligible,
       bookingsCount,
-      offer: isEligible ? offer : null
+      offer: isEligible ? offer : null,
     });
   } catch (error) {
-    console.error("Error checking first-time booking eligibility:", error);
+    logger.error("Error checking first-time booking eligibility", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     return NextResponse.json(
       { success: false, message: "Internal server error" },
       { status: 500 }

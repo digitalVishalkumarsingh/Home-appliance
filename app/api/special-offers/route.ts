@@ -1,149 +1,102 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
-import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
+import { verifyToken, getTokenFromRequest, AuthError, JwtPayload } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
+import { logger } from "@/app/config/logger";
 
 // Get all active special offers for users
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
-
-    // Get current date
-    const now = new Date().toISOString();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
+    const now = new Date();
 
     // Check if user is authenticated
-    const token = getTokenFromRequest(request);
-    let userId = null;
-    let userCreatedAt = null;
+    let userId: string | null = null;
     let isNewUser = false;
+    try {
+      const token = getTokenFromRequest(request);
+      const decoded = await verifyToken(token);
+      userId = decoded.userId;
 
-    if (token) {
-      try {
-        const decoded = verifyToken(token);
-        if (decoded && typeof decoded === 'object' && 'userId' in decoded) {
-          userId = decoded.userId;
-
-          // Get user creation date to determine if they're a new user
-          const user = await db.collection("users").findOne({
-            _id: new ObjectId(userId)
-          });
-
-          if (user) {
-            userCreatedAt = user.createdAt;
-
-            // Consider a user "new" if their account is less than 7 days old
-            const creationDate = new Date(userCreatedAt);
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-            isNewUser = creationDate > sevenDaysAgo;
-          }
-        }
-      } catch (error) {
-        console.error("Token verification failed:", error);
-        // Continue without user context
+      // Get user creation date to determine if they're a new user
+      const user = await db.collection("users").findOne({ _id: new ObjectId(userId) });
+      if (user && user.createdAt) {
+        const creationDate = new Date(user.createdAt);
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        isNewUser = creationDate > sevenDaysAgo;
+        logger.debug("User status checked", { userId, isNewUser });
       }
+    } catch (error) {
+      logger.warn("Token verification failed, proceeding as unauthenticated", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        code: error instanceof AuthError ? error.code : "UNKNOWN",
+      });
     }
 
-    // Build query based on user status
-    let query: any = {
+    // Build query for special offers
+    const query: any = {
       isActive: true,
       startDate: { $lte: now },
-      endDate: { $gte: now }
+      endDate: { $gte: now },
     };
 
-    // Filter by user type if authenticated
     if (userId) {
-      if (isNewUser) {
-        // New users can see offers for new users and all users
-        query.userType = { $in: ["new", "all"] };
-
-        // Create a notification for the new user about special offers
-        try {
-          // Check if we've already created a notification for this user
-          const existingNotification = await db.collection("notifications").findOne({
-            userId,
-            type: "new_user_offer"
-          });
-
-          if (!existingNotification) {
-            // Create a notification about special offers for new users
-            await db.collection("notifications").insertOne({
-              userId,
-              title: "Welcome Discount!",
-              message: "As a new user, you have access to exclusive discounts on our services. Check them out!",
-              type: "new_user_offer",
-              isRead: false,
-              createdAt: new Date().toISOString()
-            });
-          }
-        } catch (notificationError) {
-          console.error("Error creating new user offer notification:", notificationError);
-          // Continue even if notification creation fails
-        }
-      } else {
-        // Existing users can see offers for existing users and all users
-        query.userType = { $in: ["existing", "all"] };
-      }
+      query.userType = { $in: isNewUser ? ["new", "all"] : ["existing", "all"] };
     } else {
-      // Unauthenticated users can only see offers for all users
       query.userType = "all";
     }
 
-    // Find all active special offers matching the criteria
-    let specialOffers = [];
-    try {
-      const cursor = db.collection("specialOffers").find(query);
+    // Fetch active special offers
+    const specialOffers = await db
+      .collection("specialOffers")
+      .find(query)
+      .sort({ createdAt: -1 })
+      .toArray();
 
-      // Check if sort method exists and is a function
-      if (cursor.sort && typeof cursor.sort === 'function') {
-        const sortedCursor = cursor.sort({ createdAt: -1 });
+    // Create notification for new users
+    if (userId && isNewUser) {
+      try {
+        const existingNotification = await db.collection("notifications").findOne({
+          userId,
+          type: "new_user_offer",
+        });
 
-        // Check if toArray method exists and is a function
-        if (sortedCursor.toArray && typeof sortedCursor.toArray === 'function') {
-          specialOffers = await sortedCursor.toArray();
+        if (!existingNotification) {
+          await db.collection("notifications").insertOne({
+            userId,
+            title: "Welcome Discount!",
+            message: "As a new user, you have access to exclusive discounts on our services. Check them out!",
+            type: "new_user_offer",
+            isRead: false,
+            createdAt: now,
+          });
+          logger.debug("New user notification created", { userId });
         }
+      } catch (error) {
+        logger.warn("Failed to create new user notification", {
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       }
-    } catch (queryError) {
-      console.error("Error in MongoDB query:", queryError);
-      // Continue with empty specialOffers array
     }
 
-    // If user is authenticated, check usage limits
+    // Filter offers based on usage limits for authenticated users
     if (userId) {
-      // Get usage data for this user
-      let offerUsage = [];
-      try {
-        const cursor = db.collection("specialOfferUsage").find({ userId: userId });
+      const offerUsage = await db
+        .collection("specialOfferUsage")
+        .find({ userId })
+        .toArray();
 
-        // Check if toArray method exists and is a function
-        if (cursor.toArray && typeof cursor.toArray === 'function') {
-          offerUsage = await cursor.toArray();
-        }
-      } catch (queryError) {
-        console.error("Error in MongoDB query for offer usage:", queryError);
-        // Continue with empty offerUsage array
-      }
-
-      // Create a map of offer usage counts
       const usageCounts: Record<string, number> = {};
-      offerUsage.forEach(usage => {
+      offerUsage.forEach((usage) => {
         const offerId = usage.offerId.toString();
         usageCounts[offerId] = (usageCounts[offerId] || 0) + 1;
       });
 
-      // Filter out offers that have reached their per-user limit
-      const filteredOffers = specialOffers.filter(offer => {
+      const filteredOffers = specialOffers.filter((offer) => {
         const offerId = offer._id.toString();
         const usageCount = usageCounts[offerId] || 0;
-
-        // If there's a per-user limit and it's been reached, filter out this offer
-        if (offer.usagePerUser && usageCount >= offer.usagePerUser) {
-          return false;
-        }
-
-        return true;
+        return !offer.usagePerUser || usageCount < offer.usagePerUser;
       });
 
       return NextResponse.json({
@@ -151,16 +104,17 @@ export async function GET(request: Request) {
         specialOffers: filteredOffers,
         isNewUser,
       });
-    } else {
-      // For unauthenticated users, return all matching offers
-      return NextResponse.json({
-        success: true,
-        specialOffers,
-        isAuthenticated: false,
-      });
     }
+
+    return NextResponse.json({
+      success: true,
+      specialOffers,
+      isAuthenticated: false,
+    });
   } catch (error) {
-    console.error("Error fetching special offers:", error);
+    logger.error("Error fetching special offers", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     return NextResponse.json(
       { success: false, message: "Internal server error" },
       { status: 500 }
@@ -169,45 +123,34 @@ export async function GET(request: Request) {
 }
 
 // Apply a special offer
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    // Parse request body
-    const { offerId, serviceId, originalPrice } = await request.json();
+    // Parse and validate request body
+    const body = await request.json();
+    const { offerId, serviceId, originalPrice } = body;
 
-    // Validate required fields
-    if (!offerId || !originalPrice) {
+    if (!offerId || originalPrice === undefined) {
+      logger.warn("Missing required fields in request body", { offerId, originalPrice });
       return NextResponse.json(
-        {
-          success: false,
-          message: "Missing required fields. Need offerId and originalPrice."
-        },
+        { success: false, message: "Missing required fields: offerId and originalPrice" },
         { status: 400 }
       );
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
-
-    // Get current date
-    const now = new Date().toISOString();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
+    const now = new Date();
 
     // Find the special offer
-    let specialOffer;
-    try {
-      specialOffer = await db.collection("specialOffers").findOne({
-        _id: new ObjectId(offerId),
-        isActive: true,
-        startDate: { $lte: now },
-        endDate: { $gte: now }
-      });
-    } catch (error) {
-      return NextResponse.json(
-        { success: false, message: "Invalid offer ID" },
-        { status: 400 }
-      );
-    }
+    const specialOffer = await db.collection("specialOffers").findOne({
+      _id: new ObjectId(offerId),
+      isActive: true,
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+    });
 
     if (!specialOffer) {
+      logger.warn("Special offer not found or inactive", { offerId });
       return NextResponse.json(
         { success: false, message: "Special offer not found or not active" },
         { status: 404 }
@@ -215,137 +158,127 @@ export async function POST(request: Request) {
     }
 
     // Check if user is authenticated
-    const token = getTokenFromRequest(request);
-    let userId = null;
-    let userCreatedAt = null;
+    let userId: string | null = null;
     let isNewUser = false;
+    try {
+      const token = getTokenFromRequest(request);
+      const decoded = await verifyToken(token);
+      userId = decoded.userId;
 
-    if (token) {
-      try {
-        const decoded = verifyToken(token);
-        if (decoded && typeof decoded === 'object' && 'userId' in decoded) {
-          userId = decoded.userId;
-
-          // Get user creation date
-          const user = await db.collection("users").findOne({
-            _id: new ObjectId(userId)
-          });
-
-          if (user) {
-            userCreatedAt = user.createdAt;
-
-            // Consider a user "new" if their account is less than 7 days old
-            const creationDate = new Date(userCreatedAt);
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-            isNewUser = creationDate > sevenDaysAgo;
-          }
-        }
-      } catch (error) {
-        console.error("Token verification failed:", error);
-        // Continue without user context
+      const user = await db.collection("users").findOne({ _id: new ObjectId(userId) });
+      if (user && user.createdAt) {
+        const creationDate = new Date(user.createdAt);
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        isNewUser = creationDate > sevenDaysAgo;
       }
+    } catch (error) {
+      logger.warn("Token verification failed for POST request", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        code: error instanceof AuthError ? error.code : "UNKNOWN",
+      });
     }
 
-    // Check if the user type matches
+    // Validate user type
     if (userId) {
       if (specialOffer.userType === "new" && !isNewUser) {
+        logger.warn("Offer restricted to new users", { userId, offerId });
         return NextResponse.json(
           { success: false, message: "This offer is only for new users" },
           { status: 403 }
         );
       }
-
       if (specialOffer.userType === "existing" && isNewUser) {
+        logger.warn("Offer restricted to existing users", { userId, offerId });
         return NextResponse.json(
           { success: false, message: "This offer is only for existing users" },
           { status: 403 }
         );
       }
 
-      // Check if the user has already used this offer
+      // Check per-user usage limit
       if (specialOffer.usagePerUser) {
         const userUsageCount = await db.collection("specialOfferUsage").countDocuments({
-          userId: userId,
-          offerId: specialOffer._id
+          userId,
+          offerId: specialOffer._id,
         });
-
         if (userUsageCount >= specialOffer.usagePerUser) {
+          logger.warn("User exceeded offer usage limit", { userId, offerId, userUsageCount });
           return NextResponse.json(
-            { success: false, message: "You have already used this offer the maximum number of times" },
+            { success: false, message: "You have reached the maximum usage for this offer" },
             { status: 403 }
           );
         }
       }
     } else if (specialOffer.userType !== "all") {
-      // Unauthenticated users can only use offers for all users
+      logger.warn("Authentication required for offer", { offerId });
       return NextResponse.json(
-        { success: false, message: "You need to be logged in to use this offer" },
-        { status: 403 }
+        { success: false, message: "You must be logged in to use this offer" },
+        { status: 401 }
       );
     }
 
     // Check total usage limit
     if (specialOffer.usageLimit) {
       const totalUsageCount = await db.collection("specialOfferUsage").countDocuments({
-        offerId: specialOffer._id
+        offerId: specialOffer._id,
       });
-
       if (totalUsageCount >= specialOffer.usageLimit) {
+        logger.warn("Offer reached total usage limit", { offerId, totalUsageCount });
         return NextResponse.json(
-          { success: false, message: "This offer has reached its usage limit" },
+          { success: false, message: "This offer has reached its total usage limit" },
           { status: 403 }
         );
       }
     }
 
-    // Parse the original price
-    let price = parseFloat(originalPrice);
-    if (isNaN(price)) {
-      // Try to extract numeric value from string like "₹599"
-      const numericValue = originalPrice.replace(/[^0-9.]/g, '');
-      price = parseFloat(numericValue);
-
-      if (isNaN(price)) {
-        return NextResponse.json(
-          { success: false, message: "Invalid price format" },
-          { status: 400 }
-        );
-      }
+    // Parse and validate price
+    let price: number;
+    if (typeof originalPrice === "number") {
+      price = originalPrice;
+    } else if (typeof originalPrice === "string") {
+      price = parseFloat(originalPrice.replace(/[^0-9.]/g, ""));
+    } else {
+      logger.warn("Invalid price format", { originalPrice });
+      return NextResponse.json(
+        { success: false, message: "Invalid price format" },
+        { status: 400 }
+      );
+    }
+    if (isNaN(price) || price < 0) {
+      logger.warn("Invalid price value", { originalPrice, price });
+      return NextResponse.json(
+        { success: false, message: "Price must be a valid non-negative number" },
+        { status: 400 }
+      );
     }
 
     // Calculate discounted price
-    let discountedPrice = price;
     let discountAmount = 0;
-
+    let discountedPrice = price;
     if (specialOffer.discountType === "percentage") {
       discountAmount = (price * specialOffer.discountValue) / 100;
-      discountedPrice = price - discountAmount;
     } else {
       discountAmount = specialOffer.discountValue;
-      discountedPrice = price - discountAmount;
     }
+    discountedPrice = Math.max(0, price - discountAmount);
 
-    // Ensure the discounted price is not negative
-    discountedPrice = Math.max(0, discountedPrice);
-
-    // Format the prices
+    // Format prices
     const formattedOriginalPrice = `₹${price.toFixed(0)}`;
     const formattedDiscountedPrice = `₹${discountedPrice.toFixed(0)}`;
     const formattedDiscountAmount = `₹${discountAmount.toFixed(0)}`;
 
-    // Record offer usage if user is logged in
+    // Record offer usage for authenticated users
     if (userId) {
       await db.collection("specialOfferUsage").insertOne({
         userId,
         offerId: specialOffer._id,
-        serviceId: serviceId || null,
+        serviceId: serviceId ? new ObjectId(serviceId) : null,
         originalPrice: price,
         discountedPrice,
         discountAmount,
-        appliedAt: new Date().toISOString()
+        appliedAt: now,
       });
+      logger.debug("Offer usage recorded", { userId, offerId, serviceId });
     }
 
     return NextResponse.json({
@@ -360,11 +293,13 @@ export async function POST(request: Request) {
         formattedDiscountAmount,
         savings: specialOffer.discountType === "percentage"
           ? `${specialOffer.discountValue}% off`
-          : `₹${specialOffer.discountValue} off`
-      }
+          : `₹${specialOffer.discountValue} off`,
+      },
     });
   } catch (error) {
-    console.error("Error applying special offer:", error);
+    logger.error("Error applying special offer", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     return NextResponse.json(
       { success: false, message: "Internal server error" },
       { status: 500 }

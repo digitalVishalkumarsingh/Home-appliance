@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { FaLock, FaKey } from "react-icons/fa";
 import Swal from "sweetalert2";
-import AuthFooter from "@/app/components/AuthFooter";
+
 import { logger } from "@/app/config/logger";
 
 interface ResetPasswordClientProps {
@@ -252,7 +252,7 @@ export default function ResetPasswordClient({ token }: ResetPasswordClientProps)
           </div>
         </motion.div>
       </div>
-      <AuthFooter />
+   
     </div>
   );
 }

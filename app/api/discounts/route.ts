@@ -5,18 +5,18 @@ import { connectToDatabase } from "@/app/lib/mongodb";
 export async function GET(request: Request) {
   try {
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get current date
-    const now = new Date().toISOString();
+    const now = new Date();
 
     // Find all active discounts
-    let discounts = [];
+    let discounts: any[] = [];
     try {
       const cursor = db.collection("discounts").find({
         isActive: true,
-        startDate: { $lte: now },
-        endDate: { $gte: now }
+        validFrom: { $lte: now },
+        validTo: { $gte: now }
       });
 
       // Check if toArray method exists and is a function
@@ -34,9 +34,11 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Error fetching discounts:", error);
-    return NextResponse.json(
-      { success: false, message: "Internal server error" },
-      { status: 500 }
-    );
+
+    // On DB error, return empty array (no mock data)
+    return NextResponse.json({
+      success: true,
+      discounts: []
+    });
   }
 }

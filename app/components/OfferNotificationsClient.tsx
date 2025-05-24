@@ -37,8 +37,8 @@ export default function OfferNotificationsClient() {
   useEffect(() => {
     if (!isMounted) return;
 
-    // Don't fetch discounts for admin users
-    if (isAdmin || (user && user.role === 'admin')) {
+    // Don't fetch discounts for admin or technician users
+    if (isAdmin || (user && (user.role === 'admin' || user.role === 'technician'))) {
       return;
     }
 
@@ -122,12 +122,12 @@ export default function OfferNotificationsClient() {
   const shouldShowNotifications = () => {
     if (!isMounted) return false;
 
-    // Don't show if no discounts, user dismissed, or user is admin
+    // Don't show if no discounts, user dismissed, or user is admin or technician
     if (
       discounts.length === 0 ||
       localStorage.getItem('offers_dismissed') === 'true' ||
       isAdmin ||
-      (user && user.role === 'admin')
+      (user && (user.role === 'admin' || user.role === 'technician'))
     ) {
       return false;
     }

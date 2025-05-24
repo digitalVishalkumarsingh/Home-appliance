@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     }
 
     // Connect to the database
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Find orders by customer email
     // First check in the payments collection

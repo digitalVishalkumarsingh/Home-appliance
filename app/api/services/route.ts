@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server";
-import { services as staticServices } from "@/app/lib/services";
 import { connectToDatabase } from "@/app/lib/mongodb";
 
 export async function GET() {
   try {
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get all services from the database
-    let dbServices = [];
+    let dbServices: any[] = [];
     try {
-      // Try the standard MongoDB query chain
       const cursor = db.collection("services").find({ isActive: true });
-
-      // Check if sort method exists and is a function
       if (cursor.sort && typeof cursor.sort === 'function') {
         const sortedCursor = cursor.sort({ title: 1 });
-
-        // Check if toArray method exists and is a function
         if (sortedCursor.toArray && typeof sortedCursor.toArray === 'function') {
           dbServices = await sortedCursor.toArray();
         }
@@ -27,29 +21,15 @@ export async function GET() {
       // Continue with empty dbServices array
     }
 
-    // If there are services in the database, return them
-    if (dbServices && dbServices.length > 0) {
-      console.log(`Returning ${dbServices.length} services from database`);
-      return NextResponse.json({
-        services: dbServices,
-        source: "database"
-      });
-    }
-
-    // Otherwise, return the static services
-    console.log("No services found in database, returning static services");
+    // Only return real DB data or empty array
     return NextResponse.json({
-      services: staticServices,
-      source: "static"
+      services: dbServices
     });
   } catch (error) {
     console.error("Error fetching services:", error);
-
-    // Fallback to static services in case of database error
-    console.log("Database error, falling back to static services");
+    // On DB error, return empty array
     return NextResponse.json({
-      services: staticServices,
-      source: "static-fallback"
+      services: []
     });
   }
 }

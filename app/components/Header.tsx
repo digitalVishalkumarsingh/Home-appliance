@@ -1,28 +1,31 @@
 "use client";
 import Link from "next/link";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUser, FaSignOutAlt, FaUserPlus, FaBell } from "react-icons/fa";
+
 import NotificationBadge from "./NotificationBadge";
 import BookingNotification from "./BookingNotification";
 import useAuth from "@/app/hooks/useAuth";
+// Theme component temporarily disabled
+// import ThemeToggle from "./ThemeToggle";
+import UserProfileDropdown from "./UserProfileDropdown";
 
 const Header = () => {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, fetchUser } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isServicesDropdownOpen, setIsServicesDropdownOpen] = useState(false);
-  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+
+
   const [isClient, setIsClient] = useState(false);
   const [isOnAuthPage, setIsOnAuthPage] = useState(false);
 
+  // We'll handle this in the LayoutWrapper component instead
+
   const handleServicesMouseEnter = () => setIsServicesDropdownOpen(true);
   const handleServicesMouseLeave = () => setIsServicesDropdownOpen(false);
-  const handleProfileMouseEnter = () => setIsProfileDropdownOpen(true);
-  const handleProfileMouseLeave = () => {};
-  const toggleProfileDropdown = () => setIsProfileDropdownOpen(!isProfileDropdownOpen);
   const handleMobileToggle = () => setIsMobileMenuOpen(!isMobileMenuOpen);
 
-  // Check if we're on an auth page (login/signup)
+  // Check if we're on an auth page (login/signup) and update client state
   useEffect(() => {
     setIsClient(true);
 
@@ -30,6 +33,15 @@ const Header = () => {
       if (typeof window !== 'undefined') {
         const onAuthPage = sessionStorage.getItem("onAuthPage") === "true";
         setIsOnAuthPage(onAuthPage);
+      }
+    };
+
+    const handleAuthChange = () => {
+      console.log('Header - authChange event received, refreshing user data');
+      checkAuthPage();
+      // Force refresh user data when auth changes
+      if (fetchUser) {
+        fetchUser();
       }
     };
 
@@ -41,37 +53,30 @@ const Header = () => {
       }
     };
 
+    // Check auth page status on auth changes and page loads
     window.addEventListener("storage", handleStorageChange);
-    window.addEventListener("authChange", checkAuthPage);
+    window.addEventListener("authChange", handleAuthChange);
+    window.addEventListener("load", checkAuthPage);
+
+    // Log authentication state for debugging
+    if (typeof window !== 'undefined') {
+      console.log("Auth state in Header:", {
+        user: localStorage.getItem("user"),
+        token: localStorage.getItem("token") ? "Token exists" : "No token"
+      });
+    }
 
     return () => {
       window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("authChange", checkAuthPage);
+      window.removeEventListener("authChange", handleAuthChange);
+      window.removeEventListener("load", checkAuthPage);
     };
-  }, []);
+  }, [fetchUser]);
 
   // Handle click outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-
-      // Close profile dropdown when clicking outside
-      if (isProfileDropdownOpen) {
-        const profileElements = [
-          document.getElementById('profile-dropdown-container'),
-          document.getElementById('profile-dropdown-content'),
-          document.getElementById('profile-dropdown-container-mobile'),
-          document.getElementById('mobile-profile-dropdown-content'),
-          document.getElementById('profile-toggle-button'),
-          document.getElementById('mobile-profile-toggle-button')
-        ];
-
-        const isOutside = !profileElements.some(el => el && el.contains(target));
-
-        if (isOutside) {
-          setIsProfileDropdownOpen(false);
-        }
-      }
 
       // Close mobile menu when clicking outside
       if (isMobileMenuOpen) {
@@ -83,25 +88,20 @@ const Header = () => {
           setIsMobileMenuOpen(false);
         }
       }
+
+
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isProfileDropdownOpen, isMobileMenuOpen]);
+  }, [isMobileMenuOpen]);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      window.location.href = "/";
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-  };
+  // Logout is now handled by the UserProfileDropdown component
 
   return (
-    <div>
-      <nav className="bg-gradient-to-r from-blue-800 via-indigo-700 to-blue-900 text-white fixed top-0 left-0 w-full z-50 shadow-[0_4px_20px_rgba(0,0,0,0.3)] backdrop-blur-sm border-b border-white/10">
-        <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto py-3 px-4">
+    <div className="fixed top-0 left-0 w-full z-50">
+      <nav className="bg-gradient-to-r from-blue-800 via-indigo-700 to-blue-900 text-white w-full shadow-none backdrop-blur-sm border-b-0">
+        <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto py-1 px-4">
           {/* Logo Section */}
           <Link href="/" className="flex items-center space-x-3 group">
             {/* Logo with fallback system */}
@@ -109,13 +109,13 @@ const Header = () => {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 transition={{ duration: 0.3 }}
-                className="relative h-14 w-auto flex items-center"
+                className="relative h-10 w-auto flex items-center"
               >
                 <div className="absolute -inset-2 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full opacity-0 group-hover:opacity-70 blur-xl transition duration-500"></div>
                 <img
                   src="/Dizit-Solution.webp"
                   alt="Dizit Solution Logo"
-                  className="h-14 w-auto relative z-10"
+                  className="h-10 w-auto relative z-10"
                   style={{ objectFit: 'contain' }}
                   onError={(e) => {
                     // Fallback to text if image fails to load
@@ -267,7 +267,7 @@ const Header = () => {
                             </div>
                           </Link>
                           <Link
-                            href="/washingmachinerepair"
+                            href="/washingmachine"
                             className="flex items-center px-4 py-2.5 hover:bg-indigo-50 text-gray-700 group transition-colors"
                           >
                             <span className="w-8 h-8 mr-3 flex items-center justify-center rounded-full bg-green-100 text-green-600 group-hover:bg-green-200 transition-colors">
@@ -372,7 +372,7 @@ const Header = () => {
                             </div>
                           </Link>
                           <Link
-                            href="/washingmachinerepair"
+                            href="/washingmachine"
                             className="flex items-center px-6 py-3 text-white hover:bg-indigo-600/70 transition-colors"
                             onClick={() => {
                               setIsServicesDropdownOpen(false);
@@ -413,6 +413,7 @@ const Header = () => {
                   </AnimatePresence>
                 </div>
               </li>
+
               <li>
                 <Link
                   href="/contact"
@@ -427,318 +428,55 @@ const Header = () => {
 
               {/* Admin link removed */}
 
-              {!isClient ? null : user ? (
-                <li className="relative">
-                  {/* For desktop: use hover */}
-                  <div
-                    id="profile-dropdown-container"
-                    className="hidden md:block"
-                    onMouseEnter={handleProfileMouseEnter}
-                    onMouseLeave={handleProfileMouseLeave}
-                  >
-                    <div className="flex items-center">
-                      <div className="mr-3">
-                        <NotificationBadge />
-                      </div>
-                      <Link href="/profile">
-                        <motion.div
-                          className="flex items-center py-2 px-4 text-white hover:bg-indigo-500 rounded-md md:p-0 md:hover:bg-transparent md:hover:text-yellow-300 transition duration-200 relative md:after:absolute md:after:w-0 md:hover:after:w-full md:after:h-0.5 md:after:bg-yellow-300 md:after:bottom-[-5px] md:after:left-0 md:after:transition-all md:after:duration-300"
-                          whileHover={{ scale: 1.05 }}
-                        >
-                          <div className={`w-8 h-8 rounded-full ${user.role === 'admin' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-yellow-400 to-orange-500'} text-white flex items-center justify-center mr-2 shadow-md`}>
-                            {user.role === 'admin' ? (
-                              <FaUserPlus />
-                            ) : (
-                              <FaUser />
-                            )}
-                          </div>
-                          <span>{user.name || user.email}</span>
-                        </motion.div>
-                      </Link>
-                      <motion.button
-                        id="profile-toggle-button"
-                        className="ml-1 p-1 text-white hover:bg-indigo-500 rounded-md md:hover:bg-transparent md:hover:text-yellow-300"
-                        type="button"
-                        onClick={toggleProfileDropdown}
-                        aria-label="Toggle profile menu"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          aria-hidden="true"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 10 6"
-                        >
-                          <path
-                            stroke="currentColor"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="m1 1 4 4 4-4"
-                          />
-                        </svg>
-                      </motion.button>
-                    </div>
-                    {isProfileDropdownOpen && (
-                      <motion.div
-                        id="profile-dropdown-content"
-                        className="absolute z-10 bg-white text-gray-800 rounded-lg shadow-lg w-48 mt-2 dark:bg-gray-800 dark:text-gray-200"
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <div className="py-2 text-sm">
-                          {/* Only show admin dashboard for admin users */}
-                          {user.role === 'admin' && (
-                            <Link
-                              href="/admin/dashboard"
-                              className="block px-4 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 dark:hover:text-white text-indigo-600 font-medium"
-                            >
-                              Admin Dashboard
-                            </Link>
-                          )}
+              {/* Theme Toggle - Temporarily disabled */}
 
-                          {/* Regular user links */}
-                          {user.role !== 'admin' && (
-                            <>
-                              <Link
-                                href="/profile"
-                                className="block px-4 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 dark:hover:text-white"
-                              >
-                                My Profile
-                              </Link>
-                              <Link
-                                href="/bookings"
-                                className="block px-4 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 dark:hover:text-white"
-                              >
-                                My Bookings
-                              </Link>
-                              <Link
-                                href="/orders"
-                                className="block px-4 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 dark:hover:text-white"
-                              >
-                                Order History
-                              </Link>
-                              <Link
-                                href="/saved-services"
-                                className="block px-4 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 dark:hover:text-white"
-                              >
-                                Saved Services
-                              </Link>
-                              <Link
-                                href="/notifications"
-                                className="block px-4 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 dark:hover:text-white"
-                              >
-                                Notifications
-                              </Link>
-                              <Link
-                                href="/support"
-                                className="block px-4 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 dark:hover:text-white"
-                              >
-                                Support
-                              </Link>
-                              <Link
-                                href="/settings"
-                                className="block px-4 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 dark:hover:text-white"
-                              >
-                                Settings
-                              </Link>
-                            </>
-                          )}
-
-                          <div className="border-t border-gray-100 my-1"></div>
-                          <button
-                            onClick={handleLogout}
-                            className="w-full text-left flex items-center px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-gray-700 dark:hover:text-white"
-                          >
-                            <FaSignOutAlt className="mr-2" /> Logout
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </div>
-
-                  {/* For mobile: use click */}
-                  <div className="md:hidden" id="profile-dropdown-container-mobile">
-                    <div className="flex items-center justify-between w-full">
-                      <Link
-                        href="/profile"
-                        className="flex-grow"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        <motion.div
-                          className="flex items-center py-2 px-4 text-white hover:bg-indigo-500 rounded-md transition duration-200"
-                          whileHover={{ scale: 1.05 }}
-                        >
-                          <div className={`w-8 h-8 rounded-full ${user.role === 'admin' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-yellow-400 to-orange-500'} text-white flex items-center justify-center mr-2 shadow-md`}>
-                            {user.role === 'admin' ? (
-                              <FaUserPlus />
-                            ) : (
-                              <FaUser />
-                            )}
-                          </div>
-                          <span>{user.name || user.email}</span>
-                        </motion.div>
-                      </Link>
-                      <motion.button
-                        id="mobile-profile-toggle-button"
-                        className="p-2 text-white hover:bg-indigo-500 rounded-md"
-                        type="button"
-                        onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                        aria-label="Toggle profile menu"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          aria-hidden="true"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 10 6"
-                        >
-                          <path
-                            stroke="currentColor"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="m1 1 4 4 4-4"
-                          />
-                        </svg>
-                      </motion.button>
-                    </div>
-                    {isProfileDropdownOpen && (
-                      <motion.div
-                        id="mobile-profile-dropdown-content"
-                        className="bg-indigo-700 rounded-md mt-1"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div className="py-2 text-sm">
-                          {/* Only show admin dashboard for admin users */}
-                          {user.role === 'admin' && (
-                            <Link
-                              href="/admin/dashboard"
-                              className="block px-6 py-2 text-white hover:bg-indigo-600 font-medium"
-                              onClick={() => {
-                                setIsProfileDropdownOpen(false);
-                                setIsMobileMenuOpen(false);
-                              }}
-                            >
-                              Admin Dashboard
-                            </Link>
-                          )}
-
-                          {/* Regular user links */}
-                          {user.role !== 'admin' && (
-                            <>
-                              <Link
-                                href="/profile"
-                                className="block px-6 py-2 text-white hover:bg-indigo-600"
-                                onClick={() => {
-                                  setIsProfileDropdownOpen(false);
-                                  setIsMobileMenuOpen(false);
-                                }}
-                              >
-                                My Profile
-                              </Link>
-                              <Link
-                                href="/bookings"
-                                className="block px-6 py-2 text-white hover:bg-indigo-600"
-                                onClick={() => {
-                                  setIsProfileDropdownOpen(false);
-                                  setIsMobileMenuOpen(false);
-                                }}
-                              >
-                                My Bookings
-                              </Link>
-                              <Link
-                                href="/orders"
-                                className="block px-6 py-2 text-white hover:bg-indigo-600"
-                                onClick={() => {
-                                  setIsProfileDropdownOpen(false);
-                                  setIsMobileMenuOpen(false);
-                                }}
-                              >
-                                Order History
-                              </Link>
-                              <Link
-                                href="/saved-services"
-                                className="block px-6 py-2 text-white hover:bg-indigo-600"
-                                onClick={() => {
-                                  setIsProfileDropdownOpen(false);
-                                  setIsMobileMenuOpen(false);
-                                }}
-                              >
-                                Saved Services
-                              </Link>
-                              <Link
-                                href="/notifications"
-                                className="block px-6 py-2 text-white hover:bg-indigo-600"
-                                onClick={() => {
-                                  setIsProfileDropdownOpen(false);
-                                  setIsMobileMenuOpen(false);
-                                }}
-                              >
-                                Notifications
-                              </Link>
-                              <Link
-                                href="/support"
-                                className="block px-6 py-2 text-white hover:bg-indigo-600"
-                                onClick={() => {
-                                  setIsProfileDropdownOpen(false);
-                                  setIsMobileMenuOpen(false);
-                                }}
-                              >
-                                Support
-                              </Link>
-                              <Link
-                                href="/settings"
-                                className="block px-6 py-2 text-white hover:bg-indigo-600"
-                                onClick={() => {
-                                  setIsProfileDropdownOpen(false);
-                                  setIsMobileMenuOpen(false);
-                                }}
-                              >
-                                Settings
-                              </Link>
-                            </>
-                          )}
-
-                          <div className="border-t border-indigo-600 my-1"></div>
-                          <button
-                            onClick={() => {
-                              handleLogout();
-                              setIsMobileMenuOpen(false);
-                            }}
-                            className="w-full text-left flex items-center px-6 py-2 text-white hover:bg-indigo-600"
-                          >
-                            <FaSignOutAlt className="mr-2" /> Logout
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </div>
-                </li>
+              {/* User Profile or Login/Signup */}
+              {!isClient ? null : user && user.email ? (
+                <div className="flex items-center space-x-4 ml-4">
+                  {/* Notification Icon */}
+                  <li className="relative">
+                    <NotificationBadge />
+                  </li>
+                  {/* User Profile Dropdown */}
+                  <li className="relative">
+                    <UserProfileDropdown />
+                  </li>
+                </div>
               ) : !isOnAuthPage ? (
                 <>
                   {/* Desktop login/signup buttons */}
                   <div className="hidden md:flex md:space-x-4">
                     <li>
                       <Link href="/login">
-                        <button className="relative overflow-hidden group py-2.5 px-6 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all duration-300 font-medium backdrop-blur-sm">
-                          <span className="relative z-10">Login</span>
-                          <span className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full"></span>
+                        <button className="group relative overflow-hidden py-3 px-8 bg-white/10 text-white rounded-full border border-white/20 hover:border-white/40 transition-all duration-300 font-semibold backdrop-blur-md hover:bg-white/20 hover:scale-105 hover:shadow-lg hover:shadow-white/20">
+                          <span className="relative z-10 flex items-center gap-2">
+                            <svg className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                            </svg>
+                            Login
+                          </span>
+                          <span className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-indigo-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full"></span>
+                          <span className="absolute inset-0 rounded-full bg-white/5 transform scale-0 group-hover:scale-100 transition-transform duration-500 ease-out"></span>
                         </button>
                       </Link>
                     </li>
                     <li>
                       <Link href="/signup">
-                        <button className="relative overflow-hidden py-2.5 px-6 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white rounded-full shadow-lg hover:shadow-purple-500/30 hover:scale-105 transition-all duration-300 font-medium">
-                          <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform -skew-x-12 -translate-x-full transition-transform duration-700 ease-out group-hover:translate-x-0"></span>
-                          <span className="relative">Sign Up</span>
+                        <button className="group relative overflow-hidden py-3 px-8 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 text-white rounded-full shadow-xl hover:shadow-2xl hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300 font-semibold border border-white/20">
+                          <span className="absolute inset-0 bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                          <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform -skew-x-12 -translate-x-full transition-transform duration-700 ease-out group-hover:translate-x-full"></span>
+                          <span className="relative z-10 flex items-center gap-2">
+                            <svg className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                            Sign Up
+                          </span>
+                          <span className="absolute inset-0 rounded-full bg-white/10 transform scale-0 group-hover:scale-110 transition-transform duration-500 ease-out"></span>
                         </button>
                       </Link>
                     </li>
+
+
                   </div>
 
                   {/* Mobile login/signup buttons */}
@@ -746,20 +484,33 @@ const Header = () => {
                     <li className="w-full">
                       <Link href="/login" className="w-full block">
                         <button
-                          className="w-full py-3 px-4 bg-white/10 backdrop-blur-sm text-white rounded-lg border border-white/10 hover:bg-white/20 transition-all duration-300 font-medium flex items-center justify-center"
+                          className="group w-full py-3 px-4 bg-white/10 backdrop-blur-sm text-white rounded-lg border border-white/20 hover:bg-white/20 hover:border-white/40 transition-all duration-300 font-semibold flex items-center justify-center relative overflow-hidden"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
-                          <FaUser className="mr-2" /> Login
+                          <span className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-indigo-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                          <span className="relative z-10 flex items-center gap-2">
+                            <svg className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                            </svg>
+                            Customer Login
+                          </span>
                         </button>
                       </Link>
                     </li>
                     <li className="w-full">
                       <Link href="/signup" className="w-full block">
                         <button
-                          className="w-full py-3 px-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white rounded-lg shadow-lg hover:shadow-purple-500/30 transition-all duration-300 font-medium flex items-center justify-center"
+                          className="group w-full py-3 px-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 text-white rounded-lg shadow-lg hover:shadow-xl hover:shadow-purple-500/30 transition-all duration-300 font-semibold flex items-center justify-center relative overflow-hidden"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
-                          <FaUserPlus className="mr-2" /> Sign Up
+                          <span className="absolute inset-0 bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                          <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform -skew-x-12 -translate-x-full transition-transform duration-700 ease-out group-hover:translate-x-full"></span>
+                          <span className="relative z-10 flex items-center gap-2">
+                            <svg className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                            Sign Up
+                          </span>
                         </button>
                       </Link>
                     </li>
@@ -770,8 +521,8 @@ const Header = () => {
           </div>
         </div>
       </nav>
-      {/* Booking Notification Component */}
-      {isClient && user && <BookingNotification />}
+      {/* Booking Notification Component - only for regular users */}
+      {isClient && user && user.role === 'user' && <BookingNotification />}
     </div>
   );
 };

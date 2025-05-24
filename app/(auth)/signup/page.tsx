@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { z } from "zod";
 import { FaUser, FaLock, FaEnvelope, FaPhone, FaUserPlus } from "react-icons/fa";
 import Swal from "sweetalert2";
-import AuthFooter from "@/app/components/AuthFooter";
+
 import { logger } from "@/app/config/logger";
 
 // Constants
@@ -115,11 +115,11 @@ export default function SignupPage() {
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
 
       try {
-        const response = await fetch(API_ENDPOINT, {
+        // Simplify the API endpoint to avoid any path issues
+        const response = await fetch("/api/auth/signup", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            // Add CSRF token in production
           },
           body: JSON.stringify({
             name: formData.name.trim(),
@@ -129,12 +129,12 @@ export default function SignupPage() {
           }),
           credentials: "include",
           signal: controller.signal,
-          // Ensure we're using the correct mode for CORS
-          mode: "cors",
         });
 
         // Clear the timeout
         clearTimeout(timeoutId);
+
+        console.log("Signup response status:", response.status);
 
       // Validate Content-Type to prevent JSON parsing errors
       const contentType = response.headers.get("Content-Type");
@@ -156,6 +156,9 @@ export default function SignupPage() {
         throw new Error("Invalid response from server. Please try again.");
       }
 
+      // Log the full response for debugging
+      console.log("Signup API response:", data);
+
       if (!response.ok) {
         console.warn("Signup API error", { message: data.message, status: response.status });
         throw new Error(data.message || "Registration failed");
@@ -165,19 +168,28 @@ export default function SignupPage() {
         throw new Error(data.message || "Registration failed");
       }
 
-      Swal.fire({
-        title: "Registration Successful!",
-        text: "Please sign in to continue.",
-        icon: "success",
-        timer: 2000,
-        timerProgressBar: true,
-        showConfirmButton: false,
-        customClass: {
-          popup: "dizit-swal-popup", // Branding for Dizit Solutions
-        },
-      }).then(() => {
+      // Store the userId for potential use later
+      if (data.userId) {
+        sessionStorage.setItem("newUserId", data.userId);
+      }
+
+      // Show success message and redirect
+      try {
+        Swal.fire({
+          title: "Registration Successful!",
+          text: "Please sign in to continue.",
+          icon: "success",
+          timer: 2000,
+          timerProgressBar: true,
+          showConfirmButton: false,
+        }).then(() => {
+          router.push("/login?registered=true");
+        });
+      } catch (swalError) {
+        console.error("Error showing success popup:", swalError);
+        // If Swal fails, just redirect
         router.push("/login?registered=true");
-      });
+      }
       } catch (fetchError) {
         clearTimeout(timeoutId);
         console.error("Fetch error:", fetchError);
@@ -189,8 +201,30 @@ export default function SignupPage() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An error occurred during registration";
-      // The logger now has built-in error handling
-      logger.error("Signup failed", { error: errorMessage });
+
+      // Safely log the error with more context
+      try {
+        if (error instanceof Error) {
+          logger.error("Signup failed", {
+            error: {
+              message: error.message,
+              name: error.name,
+              // Include stack for debugging
+              stack: error.stack
+            }
+          });
+        } else {
+          logger.error("Signup failed", {
+            errorDetails: typeof error === 'object' ?
+              JSON.stringify(error, null, 2).substring(0, 500) :
+              String(error)
+          });
+        }
+      } catch (logError) {
+        // If logging fails, use a simpler approach
+        console.error("Signup failed:", errorMessage);
+      }
+
       setServerError(errorMessage);
     } finally {
       setLoading(false);
@@ -387,7 +421,7 @@ export default function SignupPage() {
           </form>
         </motion.div>
       </div>
-      <AuthFooter />
+    
     </div>
   );
 }

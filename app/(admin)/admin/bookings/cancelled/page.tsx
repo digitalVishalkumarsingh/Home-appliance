@@ -8,13 +8,13 @@ import {
   FaEye,
   FaArrowLeft,
   FaDownload,
-  FaPrint,
   FaUndo,
-  FaExclamationTriangle
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import AdminBookingModal from "@/app/components/admin/AdminBookingModal";
 import Pagination from "@/app/components/admin/Pagination";
 import { toast } from "react-hot-toast";
+import PrintBookingReceipt from "@/app/components/PrintBookingReceipt";
 
 interface Booking {
   _id: string;
@@ -22,6 +22,7 @@ interface Booking {
   bookingId?: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   service: string;
   date: string;
   time: string;
@@ -34,6 +35,7 @@ interface Booking {
   cancelledBy?: string;
   cancellationReason?: string;
   createdAt: string;
+  payment?: any;
 }
 
 export default function CancelledBookingsPage() {
@@ -56,85 +58,42 @@ export default function CancelledBookingsPage() {
   const fetchCancelledBookings = async () => {
     try {
       setLoading(true);
-      // Get token from localStorage (only available on client side)
-      const token = localStorage.getItem("token");
 
-      if (!token) {
-        console.error("No token found in localStorage");
-        throw new Error("Authentication token not found");
-      }
-
-      // Fetch bookings from the API with status=cancelled
-      const response = await fetch("/api/admin/bookings?status=cancelled", {
-        headers: {
-          "Authorization": `Bearer ${token}`
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/bookings?status=cancelled`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
         }
-      });
+      );
 
       if (!response.ok) {
-        throw new Error("Failed to fetch cancelled bookings");
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch cancelled bookings: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
 
       if (data.success && Array.isArray(data.bookings)) {
-        console.log("Cancelled bookings fetched successfully:", data.bookings);
         setBookings(data.bookings);
         setFilteredBookings(data.bookings);
       } else {
-        console.error("Invalid response format:", data);
-        throw new Error("Invalid response format");
+        throw new Error(data.message || "Invalid response format");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching cancelled bookings:", error);
-      toast.error("Failed to load cancelled bookings");
-      // If API fails, use mock data for demonstration
-      const mockData = [
-        {
-          _id: "BK004",
-          customerName: "Neha Gupta",
-          customerPhone: "6543210987",
-          service: "Microwave Repair",
-          date: "2023-07-18",
-          time: "04:00 PM",
-          address: "234 River Road, Varanasi",
-          status: "cancelled",
-          paymentStatus: "refunded",
-          amount: 600,
-          cancelledAt: "2023-07-17T15:30:00Z",
-          cancelledBy: "Customer",
-          cancellationReason: "Schedule conflict",
-          createdAt: "2023-07-15T10:20:00Z"
-        },
-        {
-          _id: "BK009",
-          customerName: "Karan Malhotra",
-          customerPhone: "1098765432",
-          service: "TV Repair",
-          date: "2023-07-23",
-          time: "12:00 PM",
-          address: "789 BHU, Varanasi",
-          status: "cancelled",
-          paymentStatus: "refunded",
-          amount: 850,
-          cancelledAt: "2023-07-22T09:15:00Z",
-          cancelledBy: "Admin",
-          cancellationReason: "Technician unavailable",
-          createdAt: "2023-07-20T14:30:00Z"
-        },
-      ];
-      setBookings(mockData);
-      setFilteredBookings(mockData);
+      toast.error(error.message || "Failed to load cancelled bookings");
+      setBookings([]);
+      setFilteredBookings([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Apply filters and sorting
     let filtered = [...bookings];
 
-    // Filter by search term
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -148,13 +107,12 @@ export default function CancelledBookingsPage() {
       );
     }
 
-    // Filter by date range
     if (selectedDateRange !== "all") {
       const today = new Date();
       const startDate = new Date();
 
       if (selectedDateRange === "today") {
-        // No adjustment needed for today
+        // No adjustment needed
       } else if (selectedDateRange === "week") {
         startDate.setDate(today.getDate() - 7);
       } else if (selectedDateRange === "month") {
@@ -162,38 +120,34 @@ export default function CancelledBookingsPage() {
       }
 
       filtered = filtered.filter((booking) => {
-        const cancelDate = booking.cancelledAt
-          ? new Date(booking.cancelledAt)
-          : new Date(booking.date);
+        const cancelDate = booking.cancelledAt ? new Date(booking.cancelledAt) : new Date(booking.date);
         return cancelDate >= startDate && cancelDate <= today;
       });
     }
 
-    // Sort bookings
     filtered.sort((a, b) => {
       let fieldA = a[sortField as keyof Booking];
       let fieldB = b[sortField as keyof Booking];
 
-      // Handle nested fields like cancelledAt
       if (sortField === "cancelledAt") {
         fieldA = a.cancelledAt || a.date;
         fieldB = b.cancelledAt || b.date;
       }
 
       if (typeof fieldA === "string" && typeof fieldB === "string") {
-        return sortOrder === "asc"
-          ? fieldA.localeCompare(fieldB)
-          : fieldB.localeCompare(fieldA);
+        return sortOrder === "asc" ? fieldA.localeCompare(fieldB) : fieldB.localeCompare(fieldA);
       }
 
-      // Default sort for non-string fields
+      if (typeof fieldA === "number" && typeof fieldB === "number") {
+        return sortOrder === "asc" ? fieldA - fieldB : fieldB - fieldA;
+      }
+
       return sortOrder === "asc" ? 1 : -1;
     });
 
     setFilteredBookings(filtered);
   }, [bookings, searchTerm, selectedDateRange, sortField, sortOrder]);
 
-  // Get current bookings for pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentBookings = filteredBookings.slice(indexOfFirstItem, indexOfLastItem);
@@ -215,12 +169,16 @@ export default function CancelledBookingsPage() {
   };
 
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    try {
+      const options: Intl.DateTimeFormatOptions = {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      };
+      return new Date(dateString).toLocaleDateString("en-IN", options);
+    } catch {
+      return "N/A";
+    }
   };
 
   const handleSort = (field: string) => {
@@ -233,25 +191,36 @@ export default function CancelledBookingsPage() {
   };
 
   const exportToCSV = () => {
-    // Create CSV content
-    const headers = ["Booking ID", "Customer", "Phone", "Service", "Date", "Time", "Amount", "Cancelled At", "Cancelled By", "Reason"];
+    const headers = [
+      "Booking ID",
+      "Customer",
+      "Phone",
+      "Service",
+      "Date",
+      "Time",
+      "Amount",
+      "Cancelled At",
+      "Cancelled By",
+      "Reason",
+    ];
     const csvContent = [
       headers.join(","),
-      ...filteredBookings.map(booking => [
-        booking.bookingId || booking.id || booking._id,
-        `"${booking.customerName}"`,
-        booking.customerPhone,
-        `"${booking.service}"`,
-        formatDate(booking.date),
-        booking.time,
-        booking.amount,
-        booking.cancelledAt ? formatDate(booking.cancelledAt) : formatDate(booking.date),
-        booking.cancelledBy || "Unknown",
-        `"${booking.cancellationReason || "No reason provided"}"`
-      ].join(","))
+      ...filteredBookings.map((booking) =>
+        [
+          booking.bookingId || booking.id || booking._id,
+          `"${booking.customerName}"`,
+          booking.customerPhone,
+          `"${booking.service}"`,
+          formatDate(booking.date),
+          booking.time,
+          booking.amount,
+          booking.cancelledAt ? formatDate(booking.cancelledAt) : formatDate(booking.date),
+          booking.cancelledBy || "Unknown",
+          `"${booking.cancellationReason || "No reason provided"}"`,
+        ].join(",")
+      ),
     ].join("\n");
 
-    // Create download link
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -266,20 +235,16 @@ export default function CancelledBookingsPage() {
   const handleReactivateBooking = async (bookingId: string) => {
     try {
       setProcessingBookingId(bookingId);
-      const token = localStorage.getItem("token");
 
-      if (!token) {
-        throw new Error("Authentication token not found");
-      }
-
-      const response = await fetch(`/api/admin/bookings/${bookingId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: "pending" })
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/bookings/${bookingId}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status: "pending" }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -288,67 +253,68 @@ export default function CancelledBookingsPage() {
 
       toast.success("Booking reactivated successfully");
       fetchCancelledBookings();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error reactivating booking:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to reactivate booking");
+      toast.error(error.message || "Failed to reactivate booking");
     } finally {
       setProcessingBookingId(null);
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Cancelled Bookings</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            View and manage all cancelled service bookings
-          </p>
+          <p className="mt-1 text-sm text-gray-500">View and manage all cancelled service bookings</p>
         </div>
-        <div className="mt-4 sm:mt-0 flex space-x-3">
+        <div className="mt-4 flex space-x-3 sm:mt-0">
           <Link
             href="/admin/bookings"
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            aria-label="Return to all bookings"
           >
-            <FaArrowLeft className="mr-2 -ml-1 h-5 w-5 text-gray-500" />
+            <FaArrowLeft className="mr-2 -ml-1 h-5 w-5 text-gray-500" aria-hidden="true" />
             All Bookings
           </Link>
           <button
             onClick={exportToCSV}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            aria-label="Export bookings to CSV"
           >
-            <FaDownload className="mr-2 -ml-1 h-5 w-5" />
+            <FaDownload className="mr-2 -ml-1 h-5 w-5" aria-hidden="true" />
             Export
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="relative flex-grow max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FaSearch className="h-5 w-5 text-gray-400" />
+      <div className="overflow-hidden rounded-lg bg-white shadow">
+        <div className="border-b border-gray-200 p-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="relative max-w-md flex-grow">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <FaSearch className="h-5 w-5 text-gray-400" aria-hidden="true" />
               </div>
               <input
                 type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 placeholder="Search bookings..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                aria-label="Search bookings by customer, service, or reason"
               />
             </div>
             <div className="flex items-center">
-              <FaCalendarAlt className="mr-2 text-gray-500" />
-              <label htmlFor="dateRange" className="text-sm font-medium text-gray-700 mr-2">
+              <FaCalendarAlt className="mr-2 text-gray-500" aria-hidden="true" />
+              <label htmlFor="dateRange" className="mr-2 text-sm font-medium text-gray-700">
                 Date:
               </label>
               <select
                 id="dateRange"
                 value={selectedDateRange}
                 onChange={(e) => setSelectedDateRange(e.target.value)}
-                className="block w-full sm:w-auto pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                className="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:w-auto sm:text-sm"
+                aria-label="Filter bookings by date range"
               >
                 <option value="all">All Time</option>
                 <option value="today">Today</option>
@@ -359,15 +325,14 @@ export default function CancelledBookingsPage() {
           </div>
         </div>
 
-        {/* Bookings Table */}
         {loading ? (
           <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="inline-block h-8 w-8 rounded-full border-b-2 border-t-2 border-indigo-500"></div>
             <p className="mt-2 text-gray-500">Loading bookings...</p>
           </div>
         ) : filteredBookings.length === 0 ? (
           <div className="p-8 text-center">
-            <FaExclamationTriangle className="mx-auto h-12 w-12 text-gray-400" />
+            <FaExclamationTriangle className="mx-auto h-12 w-12 text-gray-400" aria-hidden="true" />
             <p className="mt-2 text-gray-500">No cancelled bookings found</p>
           </div>
         ) : (
@@ -377,157 +342,124 @@ export default function CancelledBookingsPage() {
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                     onClick={() => handleSort("bookingId")}
                   >
                     Booking ID
                     {sortField === "bookingId" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                     onClick={() => handleSort("customerName")}
                   >
                     Customer
                     {sortField === "customerName" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                     onClick={() => handleSort("service")}
                   >
                     Service
                     {sortField === "service" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                     onClick={() => handleSort("cancelledAt")}
                   >
                     Cancelled Date
                     {sortField === "cancelledAt" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                   >
                     Reason
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                     onClick={() => handleSort("amount")}
                   >
                     Amount
                     {sortField === "amount" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                   >
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 bg-white">
                 {currentBookings.map((booking) => (
                   <tr key={booking._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
                       {booking.bookingId || booking.id || booking._id.substring(0, 8)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {booking.customerName}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {booking.customerPhone}
-                      </div>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900">{booking.customerName}</div>
+                      <div className="text-sm text-gray-500">{booking.customerPhone}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {booking.service}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{booking.service}</td>
+                    <td className="whitespace-nowrap px-6 py-4">
                       <div className="text-sm text-gray-900">
-                        {booking.cancelledAt
-                          ? formatDate(booking.cancelledAt)
-                          : formatDate(booking.date)}
+                        {booking.cancelledAt ? formatDate(booking.cancelledAt) : formatDate(booking.date)}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        By: {booking.cancelledBy || "Unknown"}
-                      </div>
+                      <div className="text-sm text-gray-500">By: {booking.cancelledBy || "Unknown"}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {booking.cancellationReason || "No reason provided"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-6 py-4">
                       <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPaymentStatusColor(
+                        className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getPaymentStatusColor(
                           booking.paymentStatus
                         )}`}
                       >
-                        {booking.paymentStatus.charAt(0).toUpperCase() +
-                          booking.paymentStatus.slice(1)}
+                        {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
                       </span>
                       <div className="text-sm text-gray-500">
-                        ₹{new Intl.NumberFormat('en-IN', {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0
-                        }).format(booking.amount)}
+                        ₹{new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(booking.amount)}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
                       <div className="flex space-x-2">
-                        {/* View Button */}
                         <button
                           onClick={() => setSelectedBookingId(booking._id)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-100"
+                          className="rounded p-1 text-blue-600 hover:bg-blue-100 hover:text-blue-900"
                           title="View Details"
+                          aria-label={`View details for booking ${booking.bookingId || booking._id}`}
                         >
                           <FaEye />
                         </button>
-
-                        {/* Reactivate Button */}
                         <button
                           onClick={() => handleReactivateBooking(booking._id)}
                           disabled={processingBookingId === booking._id}
-                          className="text-green-600 hover:text-green-900 disabled:opacity-50 p-1 rounded hover:bg-green-100"
+                          className="rounded p-1 text-green-600 hover:bg-green-100 hover:text-green-900 disabled:opacity-50"
                           title="Reactivate Booking"
+                          aria-label={`Reactivate booking ${booking.bookingId || booking._id}`}
                         >
                           {processingBookingId === booking._id ? (
-                            <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full"></div>
+                            <div className="h-4 w-4 rounded-full border-2 border-green-500 border-t-transparent"></div>
                           ) : (
                             <FaUndo />
                           )}
                         </button>
-
-                        {/* Print Button */}
-                        <button
-                          onClick={() => setSelectedBookingId(booking._id)}
-                          className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-100"
-                          title="Print Booking"
-                        >
-                          <FaPrint />
-                        </button>
+                        <PrintBookingReceipt booking={booking} />
                       </div>
                     </td>
                   </tr>
@@ -537,17 +469,14 @@ export default function CancelledBookingsPage() {
           </div>
         )}
 
-        {/* Pagination */}
         {filteredBookings.length > 0 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
                   Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
-                  <span className="font-medium">
-                    {Math.min(indexOfLastItem, filteredBookings.length)}
-                  </span>{" "}
-                  of <span className="font-medium">{filteredBookings.length}</span> results
+                  <span className="font-medium">{Math.min(indexOfLastItem, filteredBookings.length)}</span> of{" "}
+                  <span className="font-medium">{filteredBookings.length}</span> results
                 </p>
               </div>
               <div>
@@ -563,17 +492,14 @@ export default function CancelledBookingsPage() {
         )}
       </div>
 
-      {/* Booking Details Modal */}
       <AdminBookingModal
-        bookingId={selectedBookingId || ''}
+        bookingId={selectedBookingId || ""}
         isOpen={!!selectedBookingId}
         onClose={() => {
           setSelectedBookingId(null);
-          // Refresh the bookings list after closing the modal
           fetchCancelledBookings();
         }}
-        onStatusChange={(status) => {
-          // Refresh the bookings list after status change
+        onStatusChange={() => {
           setTimeout(() => {
             fetchCancelledBookings();
           }, 1000);

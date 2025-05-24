@@ -1,8 +1,12 @@
 'use client';
 
+// AdminBookingModal - Next.js 15 Compatible
+// Handles booking details display and status management for admin users
+
 import { useState, useEffect } from 'react';
-import { FaTimes, FaCheck, FaSpinner, FaPrint, FaUser, FaCalendarAlt, FaRupeeSign } from 'react-icons/fa';
+import { FaTimes, FaCheck, FaSpinner, FaPrint, FaUser, FaCalendarAlt, FaRupeeSign, FaUserCog } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import TechnicianAssignmentModal from './TechnicianAssignmentModal';
 
 interface Booking {
   _id: string;
@@ -22,10 +26,16 @@ interface Booking {
   bookingTime?: string;
   address?: string;
   customerAddress?: string;
-  status: "pending" | "confirmed" | "completed" | "cancelled";
+  status: "pending" | "confirmed" | "completed" | "cancelled" | "assigned";
   paymentStatus: "pending" | "paid" | "failed";
   amount: number;
   createdAt: string;
+  technician?: string;
+  technicianId?: string;
+  assignedAt?: string;
+  technicianAcceptedAt?: string;
+  technicianRejectedAt?: string;
+  technicianRejectionReason?: string;
   notes?: {
     customerAddress?: string;
     address?: string;
@@ -47,6 +57,7 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
+  const [showTechnicianModal, setShowTechnicianModal] = useState(false);
 
   useEffect(() => {
     if (isOpen && bookingId && bookingId.trim() !== '') {
@@ -128,16 +139,28 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
     }
   };
 
-  const handleStatusUpdate = async (status: string) => {
-    if (!booking) return;
+  const handleStatusUpdate = async (status: Booking['status']) => {
+    if (!booking) {
+      toast.error('No booking data available');
+      return;
+    }
+
+    // Validate status transition
+    const validStatuses: Booking['status'][] = ['pending', 'confirmed', 'completed', 'cancelled', 'assigned'];
+    if (!validStatuses.includes(status)) {
+      toast.error('Invalid status provided');
+      return;
+    }
 
     try {
       setProcessingAction(status);
 
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('Authentication token not found');
+        throw new Error('Authentication token not found. Please log in again.');
       }
+
+      console.log(`Updating booking ${bookingId} status to: ${status}`);
 
       const response = await fetch(`/api/admin/bookings/${bookingId}/status`, {
         method: 'PATCH',
@@ -149,26 +172,42 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to update booking status`);
+        let errorMessage = `Failed to update booking status (${response.status})`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
 
       if (data.success) {
-        // Update local booking state
+        // Update local booking state with proper type safety
         setBooking(prev => prev ? { ...prev, status } : null);
 
         // Notify parent component
         onStatusChange(status);
 
-        // Show success message
-        toast.success(`Booking ${status === 'confirmed' ? 'accepted' : status} successfully`);
+        // Show success message with better messaging
+        const statusMessages = {
+          confirmed: 'accepted',
+          completed: 'marked as completed',
+          cancelled: 'cancelled',
+          pending: 'set to pending',
+          assigned: 'assigned'
+        };
+
+        toast.success(`Booking ${statusMessages[status] || status} successfully`);
+
+        console.log(`Booking ${bookingId} status updated to: ${status}`);
       } else {
         throw new Error(data.message || 'Failed to update booking status');
       }
     } catch (error: any) {
-      console.error(`Error updating booking status:`, error);
+      console.error(`Error updating booking status to ${status}:`, error);
       toast.error(error.message || `Failed to update booking status`);
     } finally {
       setProcessingAction(null);
@@ -382,7 +421,7 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
               </div>
               <div>
                 <div class="field-label">Date</div>
-                <div class="field-value">${getBookingDate(booking) ? formatDate(getBookingDate(booking)) : 'Not scheduled'}</div>
+                <div class="field-value">${formatDateSafely(getBookingDate(booking)) !== 'N/A' ? formatDateSafely(getBookingDate(booking)) : 'Not scheduled'}</div>
               </div>
               <div>
                 <div class="field-label">Time</div>
@@ -440,24 +479,75 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
     }
   };
 
-  // Helper function to get booking date from various possible fields
+  // Helper function to get booking date from various possible fields - Next.js 15 compatible
   const getBookingDate = (booking: Booking): string | null => {
-    return booking.date ||
-           booking.scheduledDate ||
-           booking.serviceDate ||
-           booking.bookingDate ||
-           booking.notes?.date ||
-           null;
+    const dateFields = [
+      booking.date,
+      booking.scheduledDate,
+      booking.serviceDate,
+      booking.bookingDate,
+      booking.notes?.date
+    ];
+
+    // Return the first non-empty date field
+    for (const dateField of dateFields) {
+      if (dateField && dateField.trim() !== '') {
+        return dateField;
+      }
+    }
+
+    return null;
   };
 
-  // Helper function to get booking time from various possible fields
+  // Helper function to get booking time from various possible fields - Next.js 15 compatible
   const getBookingTime = (booking: Booking): string | null => {
-    return booking.time ||
-           booking.scheduledTime ||
-           booking.serviceTime ||
-           booking.bookingTime ||
-           booking.notes?.time ||
-           null;
+    const timeFields = [
+      booking.time,
+      booking.scheduledTime,
+      booking.serviceTime,
+      booking.bookingTime,
+      booking.notes?.time
+    ];
+
+    // Return the first non-empty time field
+    for (const timeField of timeFields) {
+      if (timeField && timeField.trim() !== '') {
+        return timeField;
+      }
+    }
+
+    return null;
+  };
+
+  // Helper function to safely format dates - Next.js 15 compatible
+  const formatDateSafely = (dateString: string | null): string => {
+    if (!dateString || dateString.trim() === '') {
+      return 'N/A';
+    }
+
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+
+      return date.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid Date';
+    }
+  };
+
+  // Handle technician assignment success
+  const handleTechnicianAssignSuccess = () => {
+    // Refresh booking details
+    fetchBookingDetails();
+    // Close technician modal
+    setShowTechnicianModal(false);
   };
 
   if (!isOpen) return null;
@@ -478,6 +568,17 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
               <FaTimes className="h-5 w-5" />
             </button>
           </div>
+
+          {/* Technician Assignment Modal */}
+          {booking && (
+            <TechnicianAssignmentModal
+              isOpen={showTechnicianModal}
+              onClose={() => setShowTechnicianModal(false)}
+              bookingId={booking._id.toString()}
+              serviceType={booking.service}
+              onAssignSuccess={handleTechnicianAssignSuccess}
+            />
+          )}
 
           {/* Content */}
           <div className="p-6">
@@ -556,11 +657,7 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
                     <div>
                       <p className="text-sm text-gray-500">Date</p>
                       <p className="font-medium">
-                        {getBookingDate(booking) ? new Date(getBookingDate(booking)).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric'
-                        }) : 'Not scheduled'}
+                        {formatDateSafely(getBookingDate(booking)) !== 'N/A' ? formatDateSafely(getBookingDate(booking)) : 'Not scheduled'}
                       </p>
                     </div>
                     <div>
@@ -568,6 +665,76 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
                       <p className="font-medium">{getBookingTime(booking) || 'Not specified'}</p>
                     </div>
                   </div>
+                </div>
+
+                {/* Technician Information */}
+                <div className="bg-white border rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                      <FaUserCog className="mr-2 text-gray-500" /> Technician Assignment
+                    </h3>
+                    {!booking.technician && booking.status !== 'cancelled' && (
+                      <button
+                        onClick={() => setShowTechnicianModal(true)}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Assign Technician
+                      </button>
+                    )}
+                  </div>
+
+                  {booking.technician ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-500">Assigned Technician</p>
+                        <p className="font-medium">{booking.technician}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Assignment Date</p>
+                        <p className="font-medium">
+                          {booking.assignedAt ? new Date(booking.assignedAt).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          }) : 'N/A'}
+                        </p>
+                      </div>
+                      {booking.technicianAcceptedAt && (
+                        <div>
+                          <p className="text-sm text-gray-500">Accepted Date</p>
+                          <p className="font-medium">
+                            {new Date(booking.technicianAcceptedAt).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                      )}
+                      {booking.technicianRejectedAt && (
+                        <>
+                          <div>
+                            <p className="text-sm text-gray-500">Rejected Date</p>
+                            <p className="font-medium">
+                              {new Date(booking.technicianRejectedAt).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Rejection Reason</p>
+                            <p className="font-medium">{booking.technicianRejectionReason || 'No reason provided'}</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 italic">
+                      No technician assigned yet
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

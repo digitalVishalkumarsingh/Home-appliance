@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   FaSearch,
@@ -16,7 +16,6 @@ import { toast } from "react-hot-toast";
 
 interface Booking {
   _id: string;
-  id?: string;
   bookingId?: string;
   customerName: string;
   customerPhone: string;
@@ -25,7 +24,7 @@ interface Booking {
   time: string;
   address: string;
   status: "pending" | "confirmed" | "completed" | "cancelled";
-  paymentStatus: "pending" | "paid";
+  paymentStatus: "pending" | "paid" | "failed";
   amount: number;
   technician?: string;
   completedAt?: string;
@@ -38,105 +37,57 @@ interface Booking {
 
 export default function CompletedBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [selectedDateRange, setSelectedDateRange] = useState("all");
+  const [selectedDateRange, setSelectedDateRange] = useState<"all" | "today" | "week" | "month">("all");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<string>("completedAt");
+  const [sortField, setSortField] = useState<keyof Booking>("completedAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [loading, setLoading] = useState(true);
 
+  // Fetch completed bookings
   useEffect(() => {
+    const fetchCompletedBookings = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          throw new Error("Authentication token not found. Please log in again.");
+        }
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/bookings?status=completed`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch bookings: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success && Array.isArray(data.bookings)) {
+          setBookings(data.bookings);
+        } else {
+          throw new Error("Invalid response format from server");
+        }
+      } catch (error) {
+        console.error("Error fetching completed bookings:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to load completed bookings");
+        setBookings([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchCompletedBookings();
   }, []);
 
-  const fetchCompletedBookings = async () => {
-    try {
-      setLoading(true);
-      // Get token from localStorage (only available on client side)
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        console.error("No token found in localStorage");
-        throw new Error("Authentication token not found");
-      }
-
-      // Fetch bookings from the API with status=completed
-      const response = await fetch("/api/admin/bookings?status=completed", {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch completed bookings");
-      }
-
-      const data = await response.json();
-
-      if (data.success && Array.isArray(data.bookings)) {
-        console.log("Completed bookings fetched successfully:", data.bookings);
-        setBookings(data.bookings);
-        setFilteredBookings(data.bookings);
-      } else {
-        console.error("Invalid response format:", data);
-        throw new Error("Invalid response format");
-      }
-    } catch (error) {
-      console.error("Error fetching completed bookings:", error);
-      toast.error("Failed to load completed bookings");
-      // If API fails, use mock data for demonstration
-      const mockData = [
-        {
-          _id: "BK001",
-          customerName: "Rahul Sharma",
-          customerPhone: "9876543210",
-          service: "AC Repair",
-          date: "2023-07-15",
-          time: "10:00 AM",
-          address: "123 Main St, Varanasi",
-          status: "completed",
-          paymentStatus: "paid",
-          amount: 1200,
-          technician: "Amit Kumar",
-          completedAt: "2023-07-15T12:30:00Z",
-          completedBy: "Amit Kumar",
-          feedback: {
-            rating: 5,
-            comment: "Excellent service, very professional."
-          }
-        },
-        {
-          _id: "BK008",
-          customerName: "Ananya Mishra",
-          customerPhone: "2109876543",
-          service: "RO Water Purifier Repair",
-          date: "2023-07-22",
-          time: "10:30 AM",
-          address: "456 Lanka, Varanasi",
-          status: "completed",
-          paymentStatus: "paid",
-          amount: 750,
-          technician: "Rajesh Singh",
-          completedAt: "2023-07-22T12:15:00Z",
-          completedBy: "Rajesh Singh",
-          feedback: {
-            rating: 4,
-            comment: "Good service, fixed the issue quickly."
-          }
-        },
-      ];
-      setBookings(mockData);
-      setFilteredBookings(mockData);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // Apply filters and sorting
+  // Memoized filtered and sorted bookings
+  const filteredBookings = useMemo(() => {
     let filtered = [...bookings];
 
     // Filter by search term
@@ -147,8 +98,7 @@ export default function CompletedBookingsPage() {
           booking.customerName.toLowerCase().includes(searchLower) ||
           booking.service.toLowerCase().includes(searchLower) ||
           booking.customerPhone.includes(searchTerm) ||
-          (booking.bookingId && booking.bookingId.toLowerCase().includes(searchLower)) ||
-          (booking.id && booking.id.toLowerCase().includes(searchLower))
+          (booking.bookingId && booking.bookingId.toLowerCase().includes(searchLower))
       );
     }
 
@@ -158,7 +108,7 @@ export default function CompletedBookingsPage() {
       const startDate = new Date();
 
       if (selectedDateRange === "today") {
-        // No adjustment needed for today
+        startDate.setHours(0, 0, 0, 0);
       } else if (selectedDateRange === "week") {
         startDate.setDate(today.getDate() - 7);
       } else if (selectedDateRange === "month") {
@@ -166,36 +116,29 @@ export default function CompletedBookingsPage() {
       }
 
       filtered = filtered.filter((booking) => {
-        const bookingDate = new Date(booking.date);
+        const bookingDate = new Date(booking.completedAt || booking.date);
         return bookingDate >= startDate && bookingDate <= today;
       });
     }
 
     // Sort bookings
     filtered.sort((a, b) => {
-      let fieldA = a[sortField as keyof Booking];
-      let fieldB = b[sortField as keyof Booking];
-
-      // Handle nested fields like completedAt
-      if (sortField === "completedAt") {
-        fieldA = a.completedAt || a.date;
-        fieldB = b.completedAt || b.date;
-      }
+      const fieldA = sortField === "completedAt" ? a.completedAt || a.date : a[sortField];
+      const fieldB = sortField === "completedAt" ? b.completedAt || b.date : b[sortField];
 
       if (typeof fieldA === "string" && typeof fieldB === "string") {
-        return sortOrder === "asc"
-          ? fieldA.localeCompare(fieldB)
-          : fieldB.localeCompare(fieldA);
+        return sortOrder === "asc" ? fieldA.localeCompare(fieldB) : fieldB.localeCompare(fieldA);
       }
-
-      // Default sort for non-string fields
+      if (typeof fieldA === "number" && typeof fieldB === "number") {
+        return sortOrder === "asc" ? fieldA - fieldB : fieldB - fieldA;
+      }
       return sortOrder === "asc" ? 1 : -1;
     });
 
-    setFilteredBookings(filtered);
+    return filtered;
   }, [bookings, searchTerm, selectedDateRange, sortField, sortOrder]);
 
-  // Get current bookings for pagination
+  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentBookings = filteredBookings.slice(indexOfFirstItem, indexOfLastItem);
@@ -238,7 +181,7 @@ export default function CompletedBookingsPage() {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  const handleSort = (field: string) => {
+  const handleSort = (field: keyof Booking) => {
     if (sortField === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
@@ -248,24 +191,24 @@ export default function CompletedBookingsPage() {
   };
 
   const exportToCSV = () => {
-    // Create CSV content
     const headers = ["Booking ID", "Customer", "Phone", "Service", "Date", "Time", "Amount", "Technician", "Completed At"];
     const csvContent = [
       headers.join(","),
-      ...filteredBookings.map(booking => [
-        booking.bookingId || booking.id || booking._id,
-        `"${booking.customerName}"`,
-        booking.customerPhone,
-        `"${booking.service}"`,
-        formatDate(booking.date),
-        booking.time,
-        booking.amount,
-        booking.technician || "N/A",
-        booking.completedAt ? formatDate(booking.completedAt) : formatDate(booking.date)
-      ].join(","))
+      ...filteredBookings.map((booking) =>
+        [
+          booking.bookingId || booking._id,
+          `"${booking.customerName}"`,
+          booking.customerPhone,
+          `"${booking.service}"`,
+          formatDate(booking.date),
+          booking.time,
+          booking.amount,
+          booking.technician || booking.completedBy || "N/A",
+          booking.completedAt ? formatDate(booking.completedAt) : formatDate(booking.date),
+        ].join(",")
+      ),
     ].join("\n");
 
-    // Create download link
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -328,7 +271,7 @@ export default function CompletedBookingsPage() {
               <select
                 id="dateRange"
                 value={selectedDateRange}
-                onChange={(e) => setSelectedDateRange(e.target.value)}
+                onChange={(e) => setSelectedDateRange(e.target.value as typeof selectedDateRange)}
                 className="block w-full sm:w-auto pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
               >
                 <option value="all">All Time</option>
@@ -362,9 +305,7 @@ export default function CompletedBookingsPage() {
                   >
                     Booking ID
                     {sortField === "bookingId" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
@@ -374,9 +315,7 @@ export default function CompletedBookingsPage() {
                   >
                     Customer
                     {sortField === "customerName" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
@@ -386,9 +325,7 @@ export default function CompletedBookingsPage() {
                   >
                     Service
                     {sortField === "service" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
@@ -398,9 +335,7 @@ export default function CompletedBookingsPage() {
                   >
                     Completed Date
                     {sortField === "completedAt" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
@@ -416,9 +351,7 @@ export default function CompletedBookingsPage() {
                   >
                     Amount
                     {sortField === "amount" && (
-                      <span className="ml-1">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
+                      <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </th>
                   <th
@@ -431,30 +364,20 @@ export default function CompletedBookingsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentBookings.map((booking) => (
-                  <tr key={booking._id || booking.id || booking.bookingId} className="hover:bg-gray-50">
+                  <tr key={booking._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {booking.bookingId || booking.id || booking._id.substring(0, 8)}
+                      {booking.bookingId || booking._id.substring(0, 8)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {booking.customerName}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {booking.customerPhone}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{booking.customerName}</div>
+                      <div className="text-sm text-gray-500">{booking.customerPhone}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {booking.service}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{booking.service}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {booking.completedAt
-                          ? formatDate(booking.completedAt)
-                          : formatDate(booking.date)}
+                        {booking.completedAt ? formatDate(booking.completedAt) : formatDate(booking.date)}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {booking.time}
-                      </div>
+                      <div className="text-sm text-gray-500">{booking.time}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {booking.technician || booking.completedBy || "N/A"}
@@ -465,30 +388,25 @@ export default function CompletedBookingsPage() {
                           booking.paymentStatus
                         )}`}
                       >
-                        {booking.paymentStatus.charAt(0).toUpperCase() +
-                          booking.paymentStatus.slice(1)}
+                        {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
                       </span>
                       <div className="text-sm text-gray-500">
-                        ₹{new Intl.NumberFormat('en-IN', {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0
-                        }).format(booking.amount)}
+                        ₹{new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(
+                          booking.amount
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
-                        {/* View Button */}
                         <button
-                          onClick={() => setSelectedBookingId(booking._id || booking.id || booking.bookingId || '')}
+                          onClick={() => setSelectedBookingId(booking._id)}
                           className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-100"
                           title="View Details"
                         >
                           <FaEye />
                         </button>
-
-                        {/* Print Button */}
                         <button
-                          onClick={() => setSelectedBookingId(booking._id || booking.id || booking.bookingId || '')}
+                          onClick={() => setSelectedBookingId(booking._id)}
                           className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-100"
                           title="Print Booking"
                         >
@@ -510,10 +428,8 @@ export default function CompletedBookingsPage() {
               <div>
                 <p className="text-sm text-gray-700">
                   Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
-                  <span className="font-medium">
-                    {Math.min(indexOfLastItem, filteredBookings.length)}
-                  </span>{" "}
-                  of <span className="font-medium">{filteredBookings.length}</span> results
+                  <span className="font-medium">{Math.min(indexOfLastItem, filteredBookings.length)}</span> of{" "}
+                  <span className="font-medium">{filteredBookings.length}</span> results
                 </p>
               </div>
               <div>
@@ -530,21 +446,55 @@ export default function CompletedBookingsPage() {
       </div>
 
       {/* Booking Details Modal */}
-      <AdminBookingModal
-        bookingId={selectedBookingId || ''}
-        isOpen={!!selectedBookingId}
-        onClose={() => {
-          setSelectedBookingId(null);
-          // Refresh the bookings list after closing the modal
-          fetchCompletedBookings();
-        }}
-        onStatusChange={(status) => {
-          // Refresh the bookings list after status change
-          setTimeout(() => {
-            fetchCompletedBookings();
-          }, 1000);
-        }}
-      />
+      {selectedBookingId && (
+        <AdminBookingModal
+          bookingId={selectedBookingId}
+          isOpen={!!selectedBookingId}
+          onClose={() => {
+            setSelectedBookingId(null);
+            // Refresh bookings after modal closes
+            setLoading(true);
+            fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/bookings?status=completed`, {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            })
+              .then((response) => response.json())
+              .then((data) => {
+                if (data.success && Array.isArray(data.bookings)) {
+                  setBookings(data.bookings);
+                }
+              })
+              .catch((error) => {
+                console.error("Error refreshing bookings:", error);
+                toast.error("Failed to refresh bookings");
+              })
+              .finally(() => setLoading(false));
+          }}
+          onStatusChange={() => {
+            // Refresh bookings after status change
+            setTimeout(() => {
+              setLoading(true);
+              fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/bookings?status=completed`, {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+              })
+                .then((response) => response.json())
+                .then((data) => {
+                  if (data.success && Array.isArray(data.bookings)) {
+                    setBookings(data.bookings);
+                  }
+                })
+                .catch((error) => {
+                  console.error("Error refreshing bookings:", error);
+                  toast.error("Failed to refresh bookings");
+                })
+                .finally(() => setLoading(false));
+            }, 1000);
+          }}
+        />
+      )}
     </div>
   );
 }

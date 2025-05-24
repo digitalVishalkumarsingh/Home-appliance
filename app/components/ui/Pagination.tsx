@@ -1,158 +1,125 @@
 "use client";
 
-import { FaChevronLeft, FaChevronRight, FaAngleDoubleLeft, FaAngleDoubleRight } from "react-icons/fa";
+import { useCallback } from "react";
+import Button from "./Button";
 
+/**
+ * Props for the Pagination component.
+ */
 interface PaginationProps {
+  /** Total number of items to paginate. */
+  totalItems: number;
+  /** Number of items per page. */
+  itemsPerPage: number;
+  /** Current active page (1-based index). */
   currentPage: number;
-  totalPages: number;
-  pageNumbers: number[];
+  /** Callback function to handle page changes. */
   onPageChange: (page: number) => void;
-  showFirstLast?: boolean;
-  showPageNumbers?: boolean;
-  showPageInfo?: boolean;
-  totalItems?: number;
-  itemsPerPage?: number;
-  className?: string;
+  /** Maximum number of page buttons to show before using ellipsis (default: 5). */
+  maxPagesToShow?: number;
 }
 
+/**
+ * A reusable pagination component for navigating through pages of items.
+ * @param props - The component props.
+ */
 export default function Pagination({
-  currentPage,
-  totalPages,
-  pageNumbers,
-  onPageChange,
-  showFirstLast = true,
-  showPageNumbers = true,
-  showPageInfo = true,
   totalItems,
   itemsPerPage,
-  className = "",
+  currentPage,
+  onPageChange,
+  maxPagesToShow = 5,
 }: PaginationProps) {
-  if (totalPages <= 1) return null;
+  // Calculate total pages
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+
+  // Ensure currentPage is within valid bounds
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  // Generate page numbers to display
+  const getPageNumbers = useCallback(() => {
+    const pages: (number | string)[] = [];
+    const halfMax = Math.floor(maxPagesToShow / 2);
+
+    let startPage = Math.max(1, safeCurrentPage - halfMax);
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    // Adjust startPage if endPage is at totalPages
+    if (endPage === totalPages) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    // Add first page and ellipsis if needed
+    if (startPage > 1) {
+      pages.push(1);
+      if (startPage > 2) {
+        pages.push("...");
+      }
+    }
+
+    // Add page numbers
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    // Add last page and ellipsis if needed
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pages.push("...");
+      }
+      pages.push(totalPages);
+    }
+
+    return pages;
+  }, [safeCurrentPage, totalPages, maxPagesToShow]);
+
+  // Handle previous and next page clicks
+  const handlePrevious = () => {
+    if (safeCurrentPage > 1) {
+      onPageChange(safeCurrentPage - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (safeCurrentPage < totalPages) {
+      onPageChange(safeCurrentPage + 1);
+    }
+  };
 
   return (
-    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 ${className}`}>
-      {showPageInfo && totalItems !== undefined && itemsPerPage !== undefined && (
-        <div className="text-sm text-gray-700">
-          Showing{" "}
-          <span className="font-medium">
-            {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)}
-          </span>{" "}
-          to{" "}
-          <span className="font-medium">
-            {Math.min(currentPage * itemsPerPage, totalItems)}
-          </span>{" "}
-          of <span className="font-medium">{totalItems}</span> results
-        </div>
-      )}
+    <nav className="flex items-center justify-center space-x-2 py-4" aria-label="Pagination">
+      {/* Previous Button */}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={handlePrevious}
+        disabled={safeCurrentPage === 1}
+      >
+        Previous
+      </Button>
 
-      <nav className="flex justify-center sm:justify-end">
-        <ul className="flex items-center space-x-1">
-          {/* First page button */}
-          {showFirstLast && (
-            <li>
-              <button
-                onClick={() => onPageChange(1)}
-                disabled={currentPage === 1}
-                className={`p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
-                  currentPage === 1
-                    ? "text-gray-400 cursor-not-allowed"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-                aria-label="Go to first page"
-              >
-                <FaAngleDoubleLeft className="w-4 h-4" />
-              </button>
-            </li>
-          )}
+      {/* Page Numbers */}
+      {getPageNumbers().map((page, index) => (
+        <Button
+          key={`${page}-${index}`}
+          variant={page === safeCurrentPage ? "primary" : "secondary"}
+          size="sm"
+          onClick={() => typeof page === "number" && onPageChange(page)}
+          disabled={typeof page !== "number"}
+        >
+          {page}
+        </Button>
+      ))}
 
-          {/* Previous page button */}
-          <li>
-            <button
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
-                currentPage === 1
-                  ? "text-gray-400 cursor-not-allowed"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
-              aria-label="Go to previous page"
-            >
-              <FaChevronLeft className="w-4 h-4" />
-            </button>
-          </li>
-
-          {/* Page numbers */}
-          {showPageNumbers &&
-            pageNumbers.map((page) => (
-              <li key={page}>
-                <button
-                  onClick={() => onPageChange(page)}
-                  className={`px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
-                    currentPage === page
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                  aria-label={`Go to page ${page}`}
-                  aria-current={currentPage === page ? "page" : undefined}
-                >
-                  {page}
-                </button>
-              </li>
-            ))}
-
-          {/* Next page button */}
-          <li>
-            <button
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
-                currentPage === totalPages
-                  ? "text-gray-400 cursor-not-allowed"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
-              aria-label="Go to next page"
-            >
-              <FaChevronRight className="w-4 h-4" />
-            </button>
-          </li>
-
-          {/* Last page button */}
-          {showFirstLast && (
-            <li>
-              <button
-                onClick={() => onPageChange(totalPages)}
-                disabled={currentPage === totalPages}
-                className={`p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
-                  currentPage === totalPages
-                    ? "text-gray-400 cursor-not-allowed"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-                aria-label="Go to last page"
-              >
-                <FaAngleDoubleRight className="w-4 h-4" />
-              </button>
-            </li>
-          )}
-        </ul>
-      </nav>
-    </div>
-  );
-}
-
-export function PaginationSkeleton() {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-      <div className="h-5 w-64 bg-gray-200 animate-pulse rounded-md"></div>
-      <div className="flex justify-center sm:justify-end">
-        <div className="flex items-center space-x-1">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              className="h-8 w-8 bg-gray-200 animate-pulse rounded-md"
-            ></div>
-          ))}
-        </div>
-      </div>
-    </div>
+      {/* Next Button */}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={handleNext}
+        disabled={safeCurrentPage === totalPages}
+      >
+        Next
+      </Button>
+    </nav>
   );
 }

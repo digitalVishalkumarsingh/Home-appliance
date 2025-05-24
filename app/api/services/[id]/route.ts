@@ -20,7 +20,7 @@ export async function GET(
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Try to find service in MongoDB
     const service = await db.collection("services").findOne({ id });

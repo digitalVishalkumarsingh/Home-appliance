@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { getTokenFromRequest, verifyToken } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
@@ -9,7 +9,7 @@ export async function PATCH(
 ) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new NextRequest(request));
 
     if (!token) {
       return NextResponse.json(
@@ -18,7 +18,7 @@ export async function PATCH(
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || typeof decoded === 'string' || !decoded.userId) {
       return NextResponse.json(
@@ -38,7 +38,7 @@ export async function PATCH(
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Check if notification exists and belongs to the user
     let objectId: ObjectId;

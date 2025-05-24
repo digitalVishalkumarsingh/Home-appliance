@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     // Connect to MongoDB
     let db;
     try {
-      const connection = await connectToDatabase();
+      const connection = await connectToDatabase({ timeoutMs: 10000 });
       db = connection.db;
     } catch (dbError) {
       logger.error("Database connection failed", {
@@ -93,15 +93,28 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
-    // Create new user
-    const result = await db.collection<User>(COLLECTION_USERS).insertOne({
+    // Create new user with ObjectId
+    const userId = new ObjectId();
+
+    // Create user document
+    const newUser = {
+      _id: userId,
       name,
       email,
       phone,
       password: hashedPassword,
       role: "user",
-      createdAt: new Date(),
-      _id: new ObjectId()
+      createdAt: new Date()
+    };
+
+    // Insert user into database
+    const result = await db.collection<User>(COLLECTION_USERS).insertOne(newUser);
+
+    // Log the result
+    console.log("User registration result:", {
+      insertedId: result.insertedId.toString(),
+      acknowledged: result.acknowledged,
+      email
     });
 
     // Prepare response

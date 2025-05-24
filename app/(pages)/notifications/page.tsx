@@ -20,7 +20,7 @@ interface Notification {
 }
 
 export default function NotificationsPage() {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, syncTokenFromCookies } = useAuth();
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
@@ -28,30 +28,65 @@ export default function NotificationsPage() {
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast.error('Please log in to view your notifications');
-      router.push('/login');
+    console.log('Notifications - Auth state:', { isLoading, isAuthenticated, hasUser: !!user });
+
+    // Don't redirect while still loading
+    if (isLoading) {
+      console.log('Notifications - Still loading, waiting...');
       return;
     }
 
-    if (isAuthenticated && user) {
-      fetchNotifications();
+    // If not authenticated, try to sync token from cookies first
+    if (!isAuthenticated || !user) {
+      console.log('Notifications - Not authenticated, trying to sync token from cookies');
+      const hasToken = syncTokenFromCookies();
+
+      if (!hasToken) {
+        console.log('Notifications - No token found, redirecting to login');
+        toast.error('Please log in to view your notifications');
+        router.push('/login');
+        return;
+      } else {
+        console.log('Notifications - Token found, waiting for authentication to complete');
+        // Token was found, wait for the auth hook to process it
+        return;
+      }
     }
-  }, [isAuthenticated, isLoading, user, router]);
+
+    // User is authenticated, fetch notifications
+    console.log('Notifications - User authenticated, fetching notifications');
+    fetchNotifications();
+  }, [isAuthenticated, isLoading, user, router, syncTokenFromCookies]);
 
   const fetchNotifications = async () => {
     try {
       setIsLoadingNotifications(true);
       setError(null);
 
-      const response = await fetch('/api/user/notifications');
-      
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('/api/user/notifications', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          router.push('/login');
+          return;
+        }
         throw new Error('Failed to fetch notifications');
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setNotifications(data.notifications || []);
       } else {
@@ -67,9 +102,16 @@ export default function NotificationsPage() {
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await fetch('/api/user/notifications', {
         method: 'PATCH',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ notificationId }),
@@ -80,11 +122,11 @@ export default function NotificationsPage() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         // Update local state
-        setNotifications(prevNotifications => 
-          prevNotifications.map(notification => 
+        setNotifications(prevNotifications =>
+          prevNotifications.map(notification =>
             notification._id === notificationId ? { ...notification, isRead: true } : notification
           )
         );
@@ -99,9 +141,16 @@ export default function NotificationsPage() {
 
   const handleMarkAllAsRead = async () => {
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await fetch('/api/user/notifications', {
         method: 'PATCH',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ markAllAsRead: true }),
@@ -112,10 +161,10 @@ export default function NotificationsPage() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         // Update local state
-        setNotifications(prevNotifications => 
+        setNotifications(prevNotifications =>
           prevNotifications.map(notification => ({ ...notification, isRead: true }))
         );
         toast.success('All notifications marked as read');
@@ -130,8 +179,18 @@ export default function NotificationsPage() {
 
   const handleDeleteNotification = async (notificationId: string) => {
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await fetch(`/api/user/notifications?notificationId=${notificationId}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -139,10 +198,10 @@ export default function NotificationsPage() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         // Update local state
-        setNotifications(prevNotifications => 
+        setNotifications(prevNotifications =>
           prevNotifications.filter(notification => notification._id !== notificationId)
         );
         toast.success('Notification deleted');
@@ -161,8 +220,18 @@ export default function NotificationsPage() {
     }
 
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await fetch('/api/user/notifications?deleteAll=true', {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -170,7 +239,7 @@ export default function NotificationsPage() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         // Update local state
         setNotifications([]);
@@ -273,7 +342,7 @@ export default function NotificationsPage() {
               <span className="ml-2 text-gray-700">Show unread only</span>
             </label>
           </div>
-          
+
           <div className="flex space-x-3">
             {notifications.some(notification => !notification.isRead) && (
               <button
@@ -283,7 +352,7 @@ export default function NotificationsPage() {
                 <FaCheck className="mr-2" /> Mark all as read
               </button>
             )}
-            
+
             {notifications.length > 0 && (
               <button
                 onClick={handleDeleteAllNotifications}
@@ -299,7 +368,7 @@ export default function NotificationsPage() {
           <div className="bg-red-50 p-4 rounded-lg text-center">
             <FaExclamationCircle className="text-red-500 text-3xl mx-auto mb-2" />
             <p className="text-red-700">{error}</p>
-            <button 
+            <button
               onClick={fetchNotifications}
               className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
             >
@@ -317,7 +386,7 @@ export default function NotificationsPage() {
             <FaCheck className="text-gray-400 text-4xl mx-auto mb-4" />
             <h3 className="text-xl font-medium text-gray-700 mb-2">All caught up!</h3>
             <p className="text-gray-500 mb-4">You have no unread notifications.</p>
-            <button 
+            <button
               onClick={() => setShowUnreadOnly(false)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >

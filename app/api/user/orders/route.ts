@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
@@ -13,7 +13,7 @@ interface JwtPayload {
 export async function GET(request: Request) {
   try {
     // Extract token from request
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new NextRequest(request));
     if (!token) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: No token provided" },
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     }
 
     // Verify token
-    const decoded = verifyToken(token) as JwtPayload;
+    const decoded = await verifyToken(token) as JwtPayload;
     if (!decoded || !decoded.userId) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: Invalid token" },
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get user's bookings
     const bookings = await db

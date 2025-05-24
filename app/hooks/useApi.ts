@@ -1,133 +1,70 @@
-"use client";
-
-import { useState, useCallback } from "react";
-import { toast } from "react-hot-toast";
+// app/hooks/useApi.ts
+import { useCallback } from 'react';
+import { toast } from 'react-hot-toast';
 
 interface ApiOptions {
   url: string;
-  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-  body?: any;
-  headers?: Record<string, string>;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   withAuth?: boolean;
+  body?: any;
   showSuccessToast?: boolean;
   showErrorToast?: boolean;
   successMessage?: string;
   errorMessage?: string;
 }
 
-interface ApiState<T> {
-  data: T | null;
-  loading: boolean;
-  error: string | null;
-}
-
-interface ApiResponse<T> extends ApiState<T> {
-  execute: (overrideOptions?: Partial<ApiOptions>) => Promise<T | null>;
-  reset: () => void;
-}
-
-export function useApi<T = any>(options: ApiOptions): ApiResponse<T> {
-  const [state, setState] = useState<ApiState<T>>({
-    data: null,
-    loading: false,
-    error: null,
-  });
-
+export default function useApi<T>(p0: { url: string; method: string; withAuth: boolean; showSuccessToast: boolean; showErrorToast: boolean; errorMessage: string; }) {
   const execute = useCallback(
-    async (overrideOptions?: Partial<ApiOptions>): Promise<T | null> => {
-      const {
-        url,
-        method = "GET",
-        body,
-        headers = {},
-        withAuth = true,
-        showSuccessToast = false,
-        showErrorToast = true,
-        successMessage,
-        errorMessage,
-      } = { ...options, ...overrideOptions };
-
+    async ({
+      url,
+      method = 'GET',
+      withAuth = false,
+      body,
+      showSuccessToast = false,
+      showErrorToast = true,
+      successMessage = 'Success!',
+      errorMessage = 'An error occurred',
+    }: ApiOptions): Promise<T> => {
       try {
-        setState((prev) => ({ ...prev, loading: true, error: null }));
-
-        // Add auth token if required
-        const requestHeaders: Record<string, string> = { ...headers };
-        
-        if (withAuth) {
-          const token = localStorage.getItem("token");
-          if (token) {
-            requestHeaders["Authorization"] = `Bearer ${token}`;
-          } else {
-            throw new Error("Authentication token not found");
-          }
-        }
-
-        // Add content type for JSON requests
-        if (body && !requestHeaders["Content-Type"]) {
-          requestHeaders["Content-Type"] = "application/json";
-        }
-
-        // Prepare request options
-        const requestOptions: RequestInit = {
-          method,
-          headers: requestHeaders,
-          body: body ? JSON.stringify(body) : undefined,
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
         };
-
-        // Make the request
-        const response = await fetch(url, requestOptions);
-
-        // Parse response
-        let data;
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          data = await response.json();
-        } else {
-          data = await response.text();
-        }
-
-        // Handle error responses
-        if (!response.ok) {
-          let errorMsg = errorMessage || "An error occurred";
-          
-          if (typeof data === "object" && data !== null) {
-            errorMsg = data.message || data.error || errorMsg;
+        if (withAuth) {
+          // Assume token is stored in a cookie or localStorage; adjust as needed
+          const token = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('token='))
+            ?.split('=')[1];
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
           }
-          
-          throw new Error(errorMsg);
         }
 
-        // Show success toast if enabled
+        const response = await fetch(url, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
         if (showSuccessToast) {
-          toast.success(successMessage || "Operation successful");
+          toast.success(successMessage);
         }
-
-        setState({ data, loading: false, error: null });
-        return data;
-      } catch (error: any) {
-        const errorMsg = error.message || "An unexpected error occurred";
-        
-        // Show error toast if enabled
+        return data as T;
+      } catch (error) {
         if (showErrorToast) {
-          toast.error(errorMsg);
+          toast.error(errorMessage);
         }
-        
-        setState({ data: null, loading: false, error: errorMsg });
-        return null;
+        throw error;
       }
     },
-    [options]
+    []
   );
 
-  const reset = useCallback(() => {
-    setState({ data: null, loading: false, error: null });
-  }, []);
-
-  return {
-    ...state,
-    execute,
-    reset,
-  };
+  return { execute };
 }
-
-export default useApi;

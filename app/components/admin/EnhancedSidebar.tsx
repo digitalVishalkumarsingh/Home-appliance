@@ -29,6 +29,9 @@ import {
   FaPlus,
   FaGift,
   FaHeadset,
+  FaUserCog,
+  FaUserPlus,
+  FaWrench,
 } from "react-icons/fa";
 
 interface NavItem {
@@ -118,6 +121,16 @@ export default function EnhancedSidebar({
       ]
     },
     {
+      name: "Technicians",
+      href: "/admin/technicians",
+      icon: FaUserCog,
+      children: [
+        { name: "All Technicians", href: "/admin/technicians", icon: FaUserCog },
+        { name: "Add Technician", href: "/admin/technicians/add", icon: FaUserPlus },
+        { name: "Performance", href: "/admin/technicians/performance", icon: FaWrench },
+      ]
+    },
+    {
       name: "Customers",
       href: "/admin/customers",
       icon: FaUsers,
@@ -177,7 +190,16 @@ export default function EnhancedSidebar({
         { name: "Resolved", href: "/admin/support?status=resolved", icon: FaHeadset },
       ]
     },
-    { name: "Settings", href: "/admin/settings", icon: FaCog },
+    {
+      name: "Settings",
+      href: "/admin/settings",
+      icon: FaCog,
+      children: [
+        { name: "General Settings", href: "/admin/settings", icon: FaCog },
+        { name: "Commission Settings", href: "/admin/settings/commission", icon: FaPercent },
+        { name: "Technician Management", href: "/admin/technicians", icon: FaUserCog },
+      ]
+    },
     { name: "My Profile", href: "/admin/profile", icon: FaUser },
   ];
 

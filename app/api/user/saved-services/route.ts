@@ -1,14 +1,27 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
-import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
+import { verifyToken } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
+
+// Utility function to extract token from Authorization header
+export function getTokenFromRequest(request: Request): string | null {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader) {
+    console.log("No Authorization header found");
+    return null;
+  }
+  if (authHeader.startsWith("Bearer ")) {
+    return authHeader.replace("Bearer ", "");
+  }
+  console.log("Invalid Authorization header format");
+  return null;
+}
 
 // Get all saved services for a user
 export async function GET(request: Request) {
   try {
     // Verify user authentication
     const token = getTokenFromRequest(request);
-
     if (!token) {
       return NextResponse.json(
         { success: false, message: "Authentication required" },
@@ -16,7 +29,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
     if (!decoded) {
       return NextResponse.json(
         { success: false, message: "Invalid token" },
@@ -24,7 +37,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const userId = (decoded as { userId?: string }).userId;
+    const userId = decoded.userId;
     if (!userId) {
       return NextResponse.json(
         { success: false, message: "User ID not found in token" },
@@ -33,11 +46,11 @@ export async function GET(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Get user's saved services
     const savedServices = await db.collection("savedServices").findOne({
-      userId: userId,
+      userId,
     });
 
     if (!savedServices) {
@@ -74,7 +87,6 @@ export async function POST(request: Request) {
   try {
     // Verify user authentication
     const token = getTokenFromRequest(request);
-
     if (!token) {
       return NextResponse.json(
         { success: false, message: "Authentication required" },
@@ -82,7 +94,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
     if (!decoded) {
       return NextResponse.json(
         { success: false, message: "Invalid token" },
@@ -90,7 +102,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const userId = (decoded as { userId?: string }).userId;
+    const userId = decoded.userId;
     if (!userId) {
       return NextResponse.json(
         { success: false, message: "User ID not found in token" },
@@ -100,7 +112,6 @@ export async function POST(request: Request) {
 
     // Parse request body
     const { serviceId } = await request.json();
-
     if (!serviceId) {
       return NextResponse.json(
         { success: false, message: "Service ID is required" },
@@ -109,7 +120,7 @@ export async function POST(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Check if the service exists
     const service = await db.collection("services").findOne({
@@ -125,11 +136,11 @@ export async function POST(request: Request) {
 
     // Add service to saved services
     const result = await db.collection("savedServices").updateOne(
-      { userId: userId },
+      { userId },
       {
         $addToSet: { serviceIds: serviceId },
         $setOnInsert: {
-          userId: userId,
+          userId,
           createdAt: new Date().toISOString(),
         },
       },
@@ -156,7 +167,6 @@ export async function DELETE(request: Request) {
   try {
     // Verify user authentication
     const token = getTokenFromRequest(request);
-
     if (!token) {
       return NextResponse.json(
         { success: false, message: "Authentication required" },
@@ -164,7 +174,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
     if (!decoded) {
       return NextResponse.json(
         { success: false, message: "Invalid token" },
@@ -172,7 +182,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const userId = (decoded as { userId?: string }).userId;
+    const userId = decoded.userId;
     if (!userId) {
       return NextResponse.json(
         { success: false, message: "User ID not found in token" },
@@ -180,10 +190,9 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Get the service ID from the URL
+    // Get the service ID from the URL query parameter
     const url = new URL(request.url);
     const serviceId = url.searchParams.get("serviceId");
-
     if (!serviceId) {
       return NextResponse.json(
         { success: false, message: "Service ID is required" },
@@ -192,17 +201,37 @@ export async function DELETE(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
+
+    // Check if the document exists for the user
+    const savedServices = await db.collection("savedServices").findOne({ userId });
+    if (!savedServices) {
+      console.log(`No saved services found for userId: ${userId}`);
+      return NextResponse.json(
+        { success: false, message: "No saved services found for user" },
+        { status: 404 }
+      );
+    }
+
+    // Validate serviceId exists in savedServices
+    if (!savedServices.serviceIds.includes(serviceId)) {
+      console.log(`Service ID ${serviceId} not found in user's saved services`);
+      return NextResponse.json(
+        { success: false, message: "Service not found in saved services" },
+        { status: 404 }
+      );
+    }
 
     // Remove service from saved services
     const result = await db.collection("savedServices").updateOne(
-      { userId: userId },
+      { userId },
       {
-        $pull: { serviceIds: serviceId },
+        // $pull: { serviceIds: serviceId },
       }
     );
 
     if (result.modifiedCount === 0) {
+      console.log(`Failed to remove serviceId: ${serviceId} for userId: ${userId}`);
       return NextResponse.json(
         { success: false, message: "Service not found in saved services" },
         { status: 404 }

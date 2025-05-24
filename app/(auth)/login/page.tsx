@@ -5,7 +5,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { FaUser, FaLock, FaSignInAlt } from "react-icons/fa";
 import Swal from "sweetalert2";
-import AuthFooter from "@/app/components/AuthFooter";
+
+import { logger } from "@/app/config/logger";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -40,12 +41,14 @@ export default function LoginPage() {
     setError("");
 
     try {
-      console.log("Attempting login with:", { email: formData.email });
+      console.log("Attempting login with email:", formData.email);
 
       // Validate input
       if (!formData.email || !formData.password) {
         throw new Error("Email and password are required");
       }
+
+      console.log("Attempting to call login API endpoint");
 
       // Call the login API endpoint
       const response = await fetch("/api/auth/login", {
@@ -59,6 +62,8 @@ export default function LoginPage() {
         signal: AbortSignal.timeout(15000), // 15 seconds timeout
       });
 
+      console.log("Login API response status:", response.status);
+
       // Parse the response
       let data;
       try {
@@ -71,9 +76,27 @@ export default function LoginPage() {
 
         data = await response.json();
       } catch (jsonError) {
-        console.error("Failed to parse JSON response:", jsonError);
+        // Safely log the error
+        try {
+          console.error("Failed to parse JSON response:", jsonError instanceof Error ? {
+            message: jsonError.message,
+            name: jsonError.name,
+            stack: jsonError.stack
+          } : "Unknown error");
+        } catch (logError) {
+          console.error("JSON parsing error occurred (details could not be logged)");
+        }
+
         throw new Error("Invalid response from server. Please try again.");
       }
+
+      // Log the full response for debugging
+      console.log("Login API response data:", {
+        success: data.success,
+        message: data.message,
+        hasToken: !!data.token,
+        hasUser: !!data.user
+      });
 
       // Check if the response was successful
       if (!response.ok) {
@@ -87,21 +110,56 @@ export default function LoginPage() {
         throw new Error("Invalid response: Missing token or user data");
       }
 
-      console.log("Login successful, storing token and user data");
-      console.log("User role:", data.user.role);
+      // Check if the response indicates success
+      if (data.success === false) {
+        throw new Error(data.message || "Login failed");
+      }
 
-      // Log additional user information for debugging
-      console.log("User details:", {
-        id: data.user._id,
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role
-      });
+      console.log("Login successful, storing token and user data");
+
+      // Log user role safely
+      if (data.user && data.user.role) {
+        console.log("User role:", data.user.role);
+      }
+
+      // Log additional user information for debugging - safely
+      try {
+        console.log("User details:", {
+          id: data.user._id || data.user.id || 'unknown',
+          email: data.user.email || 'unknown',
+          name: data.user.name || 'unknown',
+          role: data.user.role || 'unknown'
+        });
+      } catch (logError) {
+        console.log("Could not log user details");
+      }
 
       // Store token in localStorage for client-side access
       try {
+        // Ensure user has a role property
+        if (!data.user.role) {
+          data.user.role = "user"; // Default role
+          console.log("Setting default role 'user' for user:", data.user.email);
+        }
+
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
+
+        // Also set a client-accessible cookie as backup for debugging
+        // This is in addition to the httpOnly cookie set by the server
+        document.cookie = `token_backup=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`;
+
+        // Log user data for debugging (safely)
+        try {
+          console.log("Login page - User data:", {
+            id: data.user._id || data.user.id || 'unknown',
+            email: data.user.email || 'unknown',
+            name: data.user.name || 'unknown',
+            role: data.user.role || 'unknown'
+          });
+        } catch (logError) {
+          console.log("Could not log detailed user data");
+        }
 
         // Check if user is newly registered and set first login flag
         if (data.isNewUser) {
@@ -113,6 +171,29 @@ export default function LoginPage() {
         const timestamp = Date.now().toString();
         localStorage.setItem("loginTimestamp", timestamp);
         console.log("Login timestamp set:", timestamp);
+
+        // Log cookie information for debugging
+        console.log("Cookies after login:", document.cookie);
+
+        // Verify that the httpOnly cookie was set by checking if we can make an authenticated request
+        console.log("Login page - Verifying authentication state");
+        try {
+          // Make a quick test request to verify the cookie is working
+          const testResponse = await fetch('/api/auth/me', {
+            method: 'GET',
+            credentials: 'include', // Important: include cookies
+          });
+          console.log("Login page - Auth verification response:", {
+            status: testResponse.status,
+            ok: testResponse.ok
+          });
+
+          if (!testResponse.ok) {
+            console.warn("Login page - Auth verification failed, but continuing with login");
+          }
+        } catch (testError) {
+          console.warn("Login page - Could not verify auth state:", testError);
+        }
       } catch (storageError) {
         console.error("Failed to store data in localStorage:", storageError);
         // Continue anyway as cookies are more important for auth
@@ -120,48 +201,18 @@ export default function LoginPage() {
 
       // Dispatch custom event to notify header component about auth change
       try {
-        window.dispatchEvent(new Event("authChange"));
+        console.log("Login - Dispatching authChange event");
+        // Small delay to ensure localStorage is updated
+        setTimeout(() => {
+          window.dispatchEvent(new Event("authChange"));
+          console.log("Login - authChange event dispatched");
+        }, 100);
       } catch (eventError) {
         console.error("Failed to dispatch authChange event:", eventError);
       }
 
-      // Store token in cookies for middleware authentication
-      try {
-        // Use secure cookie settings
-        const cookieOptions = [
-          `token=${data.token}`,
-          'path=/',
-          'max-age=86400',
-          'SameSite=Strict'
-        ];
-
-        // Add secure flag in production
-        if (window.location.protocol === 'https:') {
-          cookieOptions.push('Secure');
-        }
-
-        // Set the cookie
-        document.cookie = cookieOptions.join('; ');
-
-        // Verify the cookie was set
-        const cookies = document.cookie.split(';').map(cookie => cookie.trim());
-        const tokenCookie = cookies.find(cookie => cookie.startsWith('token='));
-
-        if (tokenCookie) {
-          console.log("Auth cookie set successfully");
-        } else {
-          console.warn("Failed to set auth cookie - trying alternative method");
-
-          // Try setting the cookie again with a different approach
-          const date = new Date();
-          date.setTime(date.getTime() + 86400 * 1000); // 1 day
-          document.cookie = `token=${data.token}; path=/; expires=${date.toUTCString()}; SameSite=Strict${window.location.protocol === 'https:' ? '; Secure' : ''}`;
-          console.log("Attempted to set auth cookie with alternative method");
-        }
-      } catch (cookieError) {
-        console.error("Error setting cookie:", cookieError);
-        // Continue anyway, we'll try to use localStorage for auth
-      }
+      // Note: Server already sets httpOnly cookies, so we don't need to set client-side cookies
+      console.log("Token stored in localStorage, server cookies should also be set");
 
       // Check if there's a pending booking
       const pendingBooking = sessionStorage.getItem("pendingBooking");
@@ -178,18 +229,21 @@ export default function LoginPage() {
           } else if (data.user.role === "admin" || data.isAdmin === true) {
             console.log("Admin user detected, redirecting to admin dashboard");
             window.location.replace("/admin/dashboard");
+          } else if (data.user.role === "technician") {
+            console.log("Technician user detected, redirecting to technician dashboard");
+            window.location.replace("/technician/dashboard");
           } else {
-            console.log("Regular user detected, redirecting to profile page");
-            window.location.href = "/profile";
+            console.log("Regular user detected, redirecting to home page");
+            window.location.href = "/";
           }
         } catch (redirectError) {
           console.error("Error during redirect:", redirectError);
-          // Fallback to profile page
-          window.location.href = "/profile";
+          // Fallback to home page
+          window.location.href = "/";
         }
       };
 
-      // For admin users, redirect immediately without popup
+      // For admin and technician users, redirect immediately without popup
       if (data.user.role === "admin" || data.isAdmin === true) {
         console.log("Admin user detected, redirecting immediately to admin dashboard");
 
@@ -204,6 +258,23 @@ export default function LoginPage() {
         setTimeout(() => {
           console.log("Fallback redirect to admin dashboard");
           window.location.href = "/admin/dashboard";
+        }, 1000);
+
+        // Don't execute any more code after redirect attempt
+        return;
+      } else if (data.user.role === "technician") {
+        console.log("Technician user detected, redirecting immediately to technician dashboard");
+
+        // Set a flag to indicate this is a fresh login
+        localStorage.setItem("freshTechnicianLogin", "true");
+
+        // Force immediate redirect using window.location.replace for technician users
+        window.location.replace("/technician/dashboard");
+
+        // As a fallback, also try the href method after a short delay
+        setTimeout(() => {
+          console.log("Fallback redirect to technician dashboard");
+          window.location.href = "/technician/dashboard";
         }, 1000);
 
         // Don't execute any more code after redirect attempt
@@ -226,8 +297,30 @@ export default function LoginPage() {
         }
       }
     } catch (err: any) {
-      console.error("Login error:", err);
-      setError(err.message || "An error occurred during login");
+      // Safely log the error with more context
+      try {
+        if (err instanceof Error) {
+          logger.error("Login failed", {
+            error: {
+              message: err.message,
+              name: err.name,
+              // Include stack for debugging
+              stack: err.stack
+            }
+          });
+        } else {
+          logger.error("Login failed", {
+            errorDetails: typeof err === 'object' ?
+              JSON.stringify(err, null, 2).substring(0, 500) :
+              String(err)
+          });
+        }
+      } catch (logError) {
+        // If logging fails, use a simpler approach
+        console.error("Login failed:", err instanceof Error ? err.message : "Unknown error");
+      }
+
+      setError(err instanceof Error ? err.message : "An error occurred during login");
     } finally {
       setLoading(false);
     }
@@ -235,6 +328,36 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
+      {/* Debug/Logout button for development */}
+      <div className="w-full flex justify-end p-4">
+        <button
+          onClick={() => {
+            try {
+              localStorage.removeItem("token");
+              localStorage.removeItem("user");
+              localStorage.removeItem("freshAdminLogin");
+              // Remove all possible auth-related local/session storage
+              localStorage.removeItem("freshTechnicianLogin");
+              localStorage.removeItem("isFirstLogin");
+              localStorage.removeItem("loginTimestamp");
+              sessionStorage.removeItem("pendingBooking");
+              sessionStorage.removeItem("onAuthPage");
+              // Remove token cookies (all paths and domains)
+              document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+              document.cookie = "auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+              document.cookie = "token_backup=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+              document.cookie = "token=; path=/; domain=" + window.location.hostname + "; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+              document.cookie = "auth_token=; path=/; domain=" + window.location.hostname + "; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+            } catch (e) {
+              // Ignore errors
+            }
+            window.location.reload();
+          }}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-xs shadow"
+        >
+          Log out / Clear Auth
+        </button>
+      </div>
       <div className="flex-grow flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -353,7 +476,7 @@ export default function LoginPage() {
         </form>
       </motion.div>
       </div>
-      <AuthFooter />
+
     </div>
   );
 }

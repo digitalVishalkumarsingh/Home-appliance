@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { FaEnvelope, FaPaperPlane } from "react-icons/fa";
 import Swal from "sweetalert2";
-import AuthFooter from "@/app/components/AuthFooter";
+
 import { logger } from "@/app/config/logger";
 
 export default function ForgotPasswordPage() {
@@ -164,7 +164,7 @@ export default function ForgotPasswordPage() {
           )}
         </motion.div>
       </div>
-      <AuthFooter />
+    
     </div>
   );
 }

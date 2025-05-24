@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new (require("next/server").NextRequest)(request));
 
     if (!token) {
       return NextResponse.json(
@@ -19,7 +19,7 @@ export async function GET(
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || typeof decoded === 'string' || !decoded.userId) {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function GET(
     const params = await context.params;
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Validate ObjectId
     let notificationId;
@@ -86,7 +86,7 @@ export async function DELETE(
 ) {
   try {
     // Verify user authentication
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new (require("next/server").NextRequest)(request));
 
     if (!token) {
       return NextResponse.json(
@@ -95,7 +95,7 @@ export async function DELETE(
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || typeof decoded === 'string' || !decoded.userId) {
       return NextResponse.json(
@@ -108,7 +108,7 @@ export async function DELETE(
     const params = await context.params;
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Validate ObjectId
     let notificationId;

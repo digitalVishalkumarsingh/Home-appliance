@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     console.log("Processing /api/user/profile request");
 
     // Extract token from request
-    const token = getTokenFromRequest(request);
+    const token = getTokenFromRequest(new NextRequest(request));
     if (!token) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: No token provided" },
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     }
 
     // Verify token
-    const decoded = verifyToken(token) as JwtPayload;
+    const decoded = await verifyToken(token) as JwtPayload;
     if (!decoded || !decoded.userId) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: Invalid token" },
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
     console.log("Connected to database");
 
     // Find user by ID
@@ -114,7 +114,7 @@ export async function GET(request: Request) {
 }
 
 // Update user profile
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
     console.log("Processing PUT /api/user/profile request");
 
@@ -128,7 +128,7 @@ export async function PUT(request: Request) {
     }
 
     // Verify token
-    const decoded = verifyToken(token) as JwtPayload;
+    const decoded = await verifyToken(token) as JwtPayload;
     if (!decoded || !decoded.userId) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: Invalid token" },
@@ -156,7 +156,7 @@ export async function PUT(request: Request) {
     const { name, email, phone, address, profileImage } = await request.json();
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Find the user by ID
     const user = await db.collection("users").findOne({

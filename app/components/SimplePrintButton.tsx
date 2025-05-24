@@ -6,40 +6,46 @@ import { toast } from 'react-hot-toast';
 
 interface Booking {
   _id: string;
-  id?: string;
   bookingId?: string;
-  customerName?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  customerEmail?: string;
-  phone?: string;
-  customerPhone?: string;
-  service?: string;
+  orderId?: string;
+  service: string;
   serviceName?: string;
+  customerName?: string;
+  name?: string;
+  customerEmail?: string;
+  email?: string;
+  customerPhone?: string;
+  phone?: string;
+  address?: string;
+  customerAddress?: string;
   date?: string;
   bookingDate?: string;
   time?: string;
   bookingTime?: string;
-  address?: string;
-  customerAddress?: string;
-  status?: string;
+  status: string;
   bookingStatus?: string;
-  paymentStatus?: string;
+  paymentStatus: string;
   amount: number;
   createdAt: string;
-  notes?: any;
-  orderId?: string;
+  notes?: {
+    service?: string;
+    customerName?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    customerAddress?: string;
+    bookingDate?: string;
+    bookingTime?: string;
+  };
 }
 
 interface SimplePrintButtonProps {
   booking: Booking;
   getBookingId: (booking: Booking) => string;
   getServiceName: (booking: Booking) => string;
-  getBookingDate: (booking: Booking) => string;
-  getBookingTime: (booking: Booking) => string;
+  getBookingDate: (booking: Booking) => string | undefined;
+  getBookingTime: (booking: Booking) => string | undefined;
   getBookingStatus: (booking: Booking) => string;
-  formatDate: (date: string) => string;
+  formatDate: (date?: string) => string;
   formatAmount: (amount: number) => string;
 }
 
@@ -128,7 +134,8 @@ const SimplePrintButton: React.FC<SimplePrintButtonProps> = ({
       const currentDate = formatDate(new Date().toISOString());
       const serviceName = getServiceName(booking) || 'N/A';
       const bookingAmount = booking?.amount !== undefined ? formatAmount(booking.amount) : 'N/A';
-      const bookingDate = getBookingDate(booking) ? formatDate(getBookingDate(booking)) : 'Not scheduled';
+      const bookingDateValue = getBookingDate(booking);
+      const bookingDate = bookingDateValue ? formatDate(bookingDateValue) : 'Not scheduled';
       const bookingTime = getBookingTime(booking) || 'Not specified';
       const customerName = getCustomerName();
       const customerPhone = getCustomerPhone();

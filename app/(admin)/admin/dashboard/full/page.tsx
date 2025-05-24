@@ -1,0 +1,182 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import DashboardOverview from "@/app/components/admin/DashboardOverview";
+import OrdersManagement from "@/app/components/admin/OrdersManagement";
+import DashboardAnalytics from "@/app/components/admin/DashboardAnalytics";
+import BookingAlerts from "@/app/components/admin/BookingAlerts";
+import { toast } from "react-hot-toast";
+import Link from "next/link";
+
+interface User {
+  role: string;
+  [key: string]: any;
+}
+
+export default function FullAdminDashboard() {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"overview" | "analytics">("overview");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+
+  const checkAdminAuth = useCallback(async () => {
+    try {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadingProgress(10);
+
+      const token = localStorage.getItem("token");
+      const userStr = localStorage.getItem("user");
+
+      if (!token || !userStr) {
+        throw new Error("No authentication data found. Please log in as admin.");
+      }
+
+      let user: User;
+      try {
+        user = JSON.parse(userStr);
+        setLoadingProgress(30);
+      } catch (parseError) {
+        console.error("Error parsing user data:", parseError);
+        throw new Error("Invalid user data. Please log in again.");
+      }
+
+      if (user.role !== "admin") {
+        throw new Error("You don't have admin privileges.");
+      }
+
+      // Validate token with API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/verify`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setLoadingProgress(70);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Invalid or expired token.");
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error("Token verification failed.");
+      }
+
+      setLoadingProgress(100);
+      toast.success("Authenticated successfully!", { duration: 2000 });
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error checking admin auth:", error);
+      toast.error(error instanceof Error ? error.message : "An error occurred. Please try again.", {
+        duration: 4000,
+      });
+      router.push("/admin/login");
+    }
+  }, [router]);
+
+  useEffect(() => {
+    checkAdminAuth();
+
+    // Show toast about dashboard
+    const toastId = toast.loading("Loading full dashboard with real-time data...");
+    return () => {
+      toast.dismiss(toastId);
+    };
+  }, [checkAdminAuth]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading full dashboard...</p>
+          <div className="mt-2 w-48 bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${loadingProgress}%` }}
+            ></div>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            {loadingProgress < 30
+              ? "Checking authentication..."
+              : loadingProgress < 70
+              ? "Verifying admin access..."
+              : "Fetching dashboard data..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Full Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">Complete overview with real-time data</p>
+        </div>
+        <Link
+          href="/admin/dashboard"
+          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          Back to Simple Dashboard
+        </Link>
+      </div>
+
+      {/* Dashboard Tabs */}
+      <div className="flex border-b border-gray-200">
+        <button
+          className={`py-4 px-6 font-medium text-sm focus:outline-none ${
+            activeTab === "overview"
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-gray-500 hover:text-gray-700 hover:border-gray-300"
+          }`}
+          onClick={() => setActiveTab("overview")}
+        >
+          Overview
+        </button>
+        <button
+          className={`py-4 px-6 font-medium text-sm focus:outline-none ${
+            activeTab === "analytics"
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-gray-500 hover:text-gray-700 hover:border-gray-300"
+          }`}
+          onClick={() => setActiveTab("analytics")}
+        >
+          Analytics
+        </button>
+      </div>
+
+      {/* Dashboard Content */}
+      <div className="space-y-6">
+        {activeTab === "overview" && (
+          <>
+            <BookingAlerts />
+            <DashboardOverview />
+            <OrdersManagement limit={5} showViewAll={true} />
+          </>
+        )}
+        {activeTab === "analytics" && <DashboardAnalytics />}
+      </div>
+
+      {/* Performance Note */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+        <p className="font-medium">Performance Note</p>
+        <p className="mt-1">
+          The full dashboard loads real-time data from multiple sources, which may affect performance. For a faster
+          experience, use the{" "}
+          <Link href="/admin/dashboard" className="underline hover:text-yellow-900">
+            simple dashboard
+          </Link>
+          .
+        </p>
+      </div>
+    </div>
+  );
+}

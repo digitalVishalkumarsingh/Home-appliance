@@ -27,7 +27,7 @@ async function readBody(readable: ReadableStream): Promise<string> {
 export async function POST(request: Request) {
   try {
     // Get the signature from the headers
-    const headersList = headers();
+    const headersList = await headers();
     const signature = headersList.get("x-razorpay-signature");
     
     if (!signature) {
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     const event = JSON.parse(body);
     
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Handle the event based on its type
     switch (event.event) {

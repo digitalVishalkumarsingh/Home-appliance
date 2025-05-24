@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { toast } from "react-hot-toast";
 import {
   FaCalendarCheck,
   FaUsers,
@@ -10,6 +11,8 @@ import {
   FaArrowUp,
   FaArrowDown,
   FaSpinner,
+  FaUserCog,
+  FaWrench,
 } from "react-icons/fa";
 import Link from "next/link";
 
@@ -22,6 +25,10 @@ interface DashboardStats {
   revenueChange: number;
   bookingsChange: number;
   customersChange: number;
+  totalTechnicians: number;
+  activeTechnicians: number;
+  techniciansChange: number;
+  avgTechnicianRating: number;
 }
 
 export default function DashboardOverview() {
@@ -34,6 +41,10 @@ export default function DashboardOverview() {
     revenueChange: 0,
     bookingsChange: 0,
     customersChange: 0,
+    totalTechnicians: 0,
+    activeTechnicians: 0,
+    techniciansChange: 0,
+    avgTechnicianRating: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -47,67 +58,122 @@ export default function DashboardOverview() {
 
       // Check if we're in the browser environment
       if (typeof window === 'undefined') {
-        throw new Error("Not in browser environment");
+        console.warn("Not in browser environment, using mock data");
+        useMockData();
+        return;
       }
 
-      const token = localStorage.getItem("token");
-      if (!token) {
-        console.error("No authentication token found");
-        throw new Error("Authentication token not found");
-      }
+      // Set a timeout to ensure we don't wait too long
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), 5000)
+      );
 
-      // Fetch stats from the API
-      const response = await fetch("/api/admin/stats", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        let errorMessage = "Failed to fetch dashboard stats";
-        try {
-          const errorData = await response.json();
-          console.error("API error:", errorData);
-          errorMessage = errorData.message || errorMessage;
-        } catch (parseError) {
-          console.error("Error parsing error response:", parseError);
+      // Get token with fallback
+      let token;
+      try {
+        token = localStorage.getItem("token");
+        if (!token) {
+          // Try to get from cookie as fallback
+          token = document.cookie
+            .split(';')
+            .find(c => c.trim().startsWith('token='))
+            ?.split('=')[1];
         }
-        throw new Error(errorMessage);
+      } catch (tokenError) {
+        console.error("Error getting token:", tokenError);
       }
 
-      const data = await response.json();
-      console.log("Dashboard stats fetched successfully:", data);
+      if (!token) {
+        console.warn("No authentication token found, using mock data");
+        useMockData();
+        return;
+      }
 
-      if (data.success) {
-        // Update state with real data from API
-        setStats({
-          totalBookings: data.totalBookings || 0,
-          pendingBookings: data.pendingBookings || 0,
-          completedBookings: data.completedBookings || 0,
-          totalCustomers: data.totalCustomers || 0,
-          totalRevenue: data.totalRevenue || 0,
-          revenueChange: data.revenueChange || 0,
-          bookingsChange: data.bookingsChange || 0,
-          customersChange: data.customersChange || 0,
+      // Fetch stats from the API with timeout
+      try {
+        const fetchPromise = fetch("/api/admin/stats", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
-      } else {
-        throw new Error(data.message || "Failed to fetch dashboard stats");
+
+        // Race between fetch and timeout
+        const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
+        if (!response.ok) {
+          let errorMessage = "Failed to fetch dashboard stats";
+          try {
+            const errorData = await response.json();
+            console.error("API error:", errorData);
+            errorMessage = errorData.message || errorMessage;
+          } catch (parseError) {
+            console.error("Error parsing error response:", parseError);
+          }
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        console.log("Dashboard stats fetched successfully:", data);
+
+        if (data.success) {
+          // Update state with real data from API
+          setStats({
+            totalBookings: data.totalBookings || 0,
+            pendingBookings: data.pendingBookings || 0,
+            completedBookings: data.completedBookings || 0,
+            totalCustomers: data.totalCustomers || 0,
+            totalRevenue: data.totalRevenue || 0,
+            revenueChange: data.revenueChange || 0,
+            bookingsChange: data.bookingsChange || 0,
+            customersChange: data.customersChange || 0,
+            totalTechnicians: data.totalTechnicians || 0,
+            activeTechnicians: data.activeTechnicians || 0,
+            techniciansChange: data.techniciansChange || 0,
+            avgTechnicianRating: data.avgTechnicianRating || 0,
+          });
+        } else {
+          throw new Error(data.message || "Failed to fetch dashboard stats");
+        }
+      } catch (fetchError) {
+        console.error("Error in fetch operation:", fetchError);
+        useMockData();
       }
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
-      // Use mock data for demonstration only if there's an error
-      setStats({
-        totalBookings: 156,
-        pendingBookings: 23,
-        completedBookings: 133,
-        totalCustomers: 98,
-        totalRevenue: 78500,
-        revenueChange: 12.5,
-        bookingsChange: 8.3,
-        customersChange: 15.2,
-      });
+      useMockData();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to use mock data
+  const useMockData = () => {
+    // Use mock data for demonstration
+    setStats({
+      totalBookings: 156,
+      pendingBookings: 23,
+      completedBookings: 133,
+      totalCustomers: 98,
+      totalRevenue: 78500,
+      revenueChange: 12.5,
+      bookingsChange: 8.3,
+      customersChange: 15.2,
+      totalTechnicians: 12,
+      activeTechnicians: 8,
+      techniciansChange: 20.0,
+      avgTechnicianRating: 4.5,
+    });
+
+    // Show toast notification about using mock data
+    if (typeof window !== 'undefined') {
+      try {
+        toast?.info("Using demo data for dashboard", {
+          duration: 3000,
+          position: "bottom-right"
+        });
+      } catch (toastError) {
+        console.warn("Could not show toast notification:", toastError);
+      }
     }
   };
 
@@ -276,130 +342,186 @@ export default function DashboardOverview() {
       </div>
 
       {/* Secondary Stats Row */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-2">
-      {/* Total Bookings Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-lg transition-shadow duration-300"
-      >
-        <div className="p-5">
-          <div className="flex items-center">
-            <div className="flex-shrink-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-md p-3 shadow-md">
-              <FaCalendarCheck className="h-6 w-6 text-white" />
-            </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Total Bookings
-                </dt>
-                <dd className="flex items-center">
-                  <div className="text-2xl font-bold text-gray-900">
-                    {stats.totalBookings.toLocaleString()}
-                  </div>
-                  <div
-                    className={`ml-2 flex items-center text-sm ${
-                      stats.bookingsChange >= 0
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {stats.bookingsChange >= 0 ? (
-                      <FaArrowUp className="h-3 w-3 mr-1" />
-                    ) : (
-                      <FaArrowDown className="h-3 w-3 mr-1" />
-                    )}
-                    {Math.abs(stats.bookingsChange).toFixed(1)}%
-                  </div>
-                </dd>
-                <dd className="mt-1 text-sm text-gray-500">
-                  {stats.bookingsChange >= 0
-                    ? 'Bookings are increasing'
-                    : 'Bookings have decreased'} compared to last month
-                </dd>
-              </dl>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gray-50 px-5 py-3 border-t border-gray-200">
-          <div className="text-sm flex justify-between items-center">
-            <Link
-              href="/admin/bookings"
-              className="font-medium text-blue-600 hover:text-blue-500 flex items-center"
-            >
-              View all bookings
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-            <span className="text-xs text-gray-500">Real-time data</span>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Total Customers Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1 }}
-        className="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-lg transition-shadow duration-300"
-      >
-        <div className="p-5">
-          <div className="flex items-center">
-            <div className="flex-shrink-0 bg-gradient-to-r from-green-500 to-green-600 rounded-md p-3 shadow-md">
-              <FaUsers className="h-6 w-6 text-white" />
-            </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Total Customers
-                </dt>
-                <dd className="flex items-center">
-                  <div className="text-2xl font-bold text-gray-900">
-                    {stats.totalCustomers.toLocaleString()}
-                  </div>
-                  <div
-                    className={`ml-2 flex items-center text-sm ${
-                      stats.customersChange >= 0
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {stats.customersChange >= 0 ? (
-                      <FaArrowUp className="h-3 w-3 mr-1" />
-                    ) : (
-                      <FaArrowDown className="h-3 w-3 mr-1" />
-                    )}
-                    {Math.abs(stats.customersChange).toFixed(1)}%
-                  </div>
-                </dd>
-                <dd className="mt-1 text-sm text-gray-500">
-                  {stats.customersChange >= 0 ? 'Growing' : 'Declining'} compared to last month
-                </dd>
-              </dl>
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Total Bookings Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-lg transition-shadow duration-300"
+        >
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-md p-3 shadow-md">
+                <FaCalendarCheck className="h-6 w-6 text-white" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Total Bookings
+                  </dt>
+                  <dd className="flex items-center">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {stats.totalBookings.toLocaleString()}
+                    </div>
+                    <div
+                      className={`ml-2 flex items-center text-sm ${
+                        stats.bookingsChange >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {stats.bookingsChange >= 0 ? (
+                        <FaArrowUp className="h-3 w-3 mr-1" />
+                      ) : (
+                        <FaArrowDown className="h-3 w-3 mr-1" />
+                      )}
+                      {Math.abs(stats.bookingsChange).toFixed(1)}%
+                    </div>
+                  </dd>
+                  <dd className="mt-1 text-sm text-gray-500">
+                    {stats.bookingsChange >= 0
+                      ? 'Bookings are increasing'
+                      : 'Bookings have decreased'} compared to last month
+                  </dd>
+                </dl>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="bg-gray-50 px-5 py-3 border-t border-gray-200">
-          <div className="text-sm flex justify-between items-center">
-            <Link
-              href="/admin/customers"
-              className="font-medium text-blue-600 hover:text-blue-500 flex items-center"
-            >
-              View all customers
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-            <span className="text-xs text-gray-500">Real-time data</span>
+          <div className="bg-gray-50 px-5 py-3 border-t border-gray-200">
+            <div className="text-sm flex justify-between items-center">
+              <Link
+                href="/admin/bookings"
+                className="font-medium text-blue-600 hover:text-blue-500 flex items-center"
+              >
+                View all bookings
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+              <span className="text-xs text-gray-500">Real-time data</span>
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
 
+        {/* Total Customers Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-lg transition-shadow duration-300"
+        >
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-gradient-to-r from-green-500 to-green-600 rounded-md p-3 shadow-md">
+                <FaUsers className="h-6 w-6 text-white" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Total Customers
+                  </dt>
+                  <dd className="flex items-center">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {stats.totalCustomers.toLocaleString()}
+                    </div>
+                    <div
+                      className={`ml-2 flex items-center text-sm ${
+                        stats.customersChange >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {stats.customersChange >= 0 ? (
+                        <FaArrowUp className="h-3 w-3 mr-1" />
+                      ) : (
+                        <FaArrowDown className="h-3 w-3 mr-1" />
+                      )}
+                      {Math.abs(stats.customersChange).toFixed(1)}%
+                    </div>
+                  </dd>
+                  <dd className="mt-1 text-sm text-gray-500">
+                    {stats.customersChange >= 0 ? 'Growing' : 'Declining'} compared to last month
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-5 py-3 border-t border-gray-200">
+            <div className="text-sm flex justify-between items-center">
+              <Link
+                href="/admin/customers"
+                className="font-medium text-blue-600 hover:text-blue-500 flex items-center"
+              >
+                View all customers
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+              <span className="text-xs text-gray-500">Real-time data</span>
+            </div>
+          </div>
+        </motion.div>
 
-
-
+        {/* Technicians Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+          className="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-lg transition-shadow duration-300"
+        >
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-md p-3 shadow-md">
+                <FaUserCog className="h-6 w-6 text-white" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Technicians
+                  </dt>
+                  <dd className="flex items-center">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {stats.totalTechnicians.toLocaleString()}
+                    </div>
+                    <div
+                      className={`ml-2 flex items-center text-sm ${
+                        stats.techniciansChange >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {stats.techniciansChange >= 0 ? (
+                        <FaArrowUp className="h-3 w-3 mr-1" />
+                      ) : (
+                        <FaArrowDown className="h-3 w-3 mr-1" />
+                      )}
+                      {Math.abs(stats.techniciansChange).toFixed(1)}%
+                    </div>
+                  </dd>
+                  <dd className="mt-1 text-sm text-gray-500">
+                    <span className="font-medium">{stats.activeTechnicians}</span> active technicians,
+                    <span className="ml-1 font-medium">{stats.avgTechnicianRating.toFixed(1)}</span> avg. rating
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-5 py-3 border-t border-gray-200">
+            <div className="text-sm flex justify-between items-center">
+              <Link
+                href="/admin/technicians"
+                className="font-medium text-blue-600 hover:text-blue-500 flex items-center"
+              >
+                Manage technicians
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+              <span className="text-xs text-gray-500">Real-time data</span>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </div>
   );

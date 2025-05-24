@@ -71,37 +71,47 @@ export async function POST(request: NextRequest) {
 
     // Try to send email notification
     let emailSent = false;
-    try {
-      // Send Email
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-        tls: {
-          rejectUnauthorized: false,
-        },
-      });
 
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: "singhvishalkumar412@gmail.com",
-        subject: `New Booking Request: ${serviceName} (${bookingId})`,
-        text: `
-          Booking ID: ${bookingId}
-          Name: ${name}
-          Phone: ${phone}
-          Service: ${serviceName}
-          Description: ${description || "No description provided"}
-        `,
-      };
+    // Check if admin booking emails are disabled
+    const sendAdminEmails = process.env.SEND_ADMIN_BOOKING_EMAILS !== "false";
 
-      const info = await transporter.sendMail(mailOptions);
-      emailSent = info.accepted.length > 0;
-    } catch (emailError) {
-      console.error("Error sending email:", emailError);
-      // Continue with saving to database even if email fails
+    if (sendAdminEmails) {
+      try {
+        // Send Email
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+          tls: {
+            rejectUnauthorized: false,
+          },
+        });
+
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: "singhvishalkumar412@gmail.com",
+          subject: `New Booking Request: ${serviceName} (${bookingId})`,
+          text: `
+            Booking ID: ${bookingId}
+            Name: ${name}
+            Phone: ${phone}
+            Service: ${serviceName}
+            Description: ${description || "No description provided"}
+          `,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        emailSent = info.accepted.length > 0;
+      } catch (emailError) {
+        console.error("Error sending email:", emailError);
+        // Continue with saving to database even if email fails
+      }
+    } else {
+      console.log("Admin booking notification email skipped (disabled by configuration)");
+      // Mark as sent to avoid confusion in the response
+      emailSent = true;
     }
 
     // Create new booking

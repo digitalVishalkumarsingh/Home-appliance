@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     }
 
     // Connect to database
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Check if this payment has already been processed
     if (transactionId) {
@@ -95,6 +95,8 @@ export async function POST(request: Request) {
     );
 
     // Create booking record
+    const bookingId = `BK${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`; // Generate a unique booking ID
+
     const booking = {
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
@@ -105,14 +107,69 @@ export async function POST(request: Request) {
       customerEmail,
       customerPhone,
       customerAddress,
+      address: customerAddress, // Add duplicate field for consistency
       bookingDate,
       bookingTime,
-      status: 'booked',
+      status: 'pending',
       createdAt: new Date(),
-      bookingId: `BK${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`, // Generate a unique booking ID
+      bookingId: bookingId,
     };
 
-    await db.collection('bookings').insertOne(booking);
+    const bookingResult = await db.collection('bookings').insertOne(booking);
+
+    // Find available technicians to create job offers
+    let technicians = await db.collection('technicians').find({
+      status: 'active',
+      isAvailable: true
+    }).limit(5).toArray(); // Limit to 5 technicians for now
+
+    // If no technicians are available with isAvailable=true, try with just active status
+    if (technicians.length === 0) {
+      console.log('No technicians with isAvailable=true found, trying with just active status');
+      technicians = await db.collection('technicians').find({
+        status: 'active'
+      }).limit(5).toArray();
+
+      // Update these technicians to be available
+      if (technicians.length > 0) {
+        const technicianIds = technicians.map(tech => tech._id);
+        await db.collection('technicians').updateMany(
+          { _id: { $in: technicianIds } },
+          { $set: { isAvailable: true } }
+        );
+        console.log(`Updated ${technicians.length} technicians to be available`);
+      }
+    }
+
+    // If still no technicians, create a default technician
+  if (technicians.length === 0) {
+    console.log('No active technicians found, creating a default technician');
+    // Optionally, you can add logic here to create a default technician if needed.
+    console.log('No active technicians found. Skipping job offer creation.');
+  } else {
+    // Create job offers for available technicians
+    console.log(`Creating job offers for ${technicians.length} technicians`);
+
+    const expiryTime = new Date();
+    expiryTime.setMinutes(expiryTime.getMinutes() + 30); // Expires in 30 minutes
+
+    const jobOffers = technicians.map(technician => ({
+      bookingId: bookingResult.insertedId.toString(),
+      bookingIdDisplay: bookingId,
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      technicianId: technician._id.toString(),
+      status: "pending",
+      distance: Math.floor(Math.random() * 10) + 1, // Random distance between 1-10 km
+      createdAt: new Date(),
+      expiresAt: expiryTime,
+      service: service,
+      amount: Number(amount)
+    }));
+
+    await db.collection("jobOffers").insertMany(jobOffers);
+    console.log(`Created ${jobOffers.length} job offers for booking ${bookingId}`);
+  }
 
     // Send booking confirmation email to customer
     let customerEmailSent = false;
@@ -169,7 +226,7 @@ export async function POST(request: Request) {
         const notification = {
           userId: user._id.toString(),
           title: "New Booking Confirmed",
-          message: `Your booking for ${service} has been confirmed.`,
+          message: `Your booking for ${service} has been confirmed. A technician will be assigned to your booking shortly.`,
           type: "booking",
           referenceId: booking.bookingId,
           isRead: false,
@@ -189,14 +246,14 @@ export async function POST(request: Request) {
     let adminNotificationCreated = false;
     try {
       // Create booking notification for admin
-      adminNotificationCreated = await createBookingNotification({
+      await createBookingNotification({
         bookingId: booking.bookingId,
         customerName,
         service,
         date: bookingDate,
         time: bookingTime,
         amount: Number(amount),
-        status: 'booked'
+        status: 'pending'
       }, Number(amount) > 1000); // Mark as important if amount is over 1000
 
       // Create payment notification for admin

@@ -21,7 +21,7 @@ interface Order {
 }
 
 export default function OrdersPage() {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, syncTokenFromCookies } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -30,30 +30,65 @@ export default function OrdersPage() {
   const [showOrderDetails, setShowOrderDetails] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast.error('Please log in to view your order history');
-      router.push('/login');
+    console.log('Orders - Auth state:', { isLoading, isAuthenticated, hasUser: !!user });
+
+    // Don't redirect while still loading
+    if (isLoading) {
+      console.log('Orders - Still loading, waiting...');
       return;
     }
 
-    if (isAuthenticated && user) {
-      fetchOrders();
+    // If not authenticated, try to sync token from cookies first
+    if (!isAuthenticated || !user) {
+      console.log('Orders - Not authenticated, trying to sync token from cookies');
+      const hasToken = syncTokenFromCookies();
+
+      if (!hasToken) {
+        console.log('Orders - No token found, redirecting to login');
+        toast.error('Please log in to view your order history');
+        router.push('/login');
+        return;
+      } else {
+        console.log('Orders - Token found, waiting for authentication to complete');
+        // Token was found, wait for the auth hook to process it
+        return;
+      }
     }
-  }, [isAuthenticated, isLoading, user, router]);
+
+    // User is authenticated, fetch orders
+    console.log('Orders - User authenticated, fetching orders');
+    fetchOrders();
+  }, [isAuthenticated, isLoading, user, router, syncTokenFromCookies]);
 
   const fetchOrders = async () => {
     try {
       setIsLoadingOrders(true);
       setError(null);
 
-      const response = await fetch('/api/user/orders');
-      
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('/api/user/orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          router.push('/login');
+          return;
+        }
         throw new Error('Failed to fetch orders');
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setOrders(data.orders || []);
       } else {
@@ -75,34 +110,44 @@ export default function OrdersPage() {
   const handleDownloadInvoice = async (orderId: string) => {
     try {
       toast.loading('Generating invoice...');
-      
-      const response = await fetch(`/api/user/orders/${orderId}/invoice`);
-      
+
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`/api/user/orders/${orderId}/invoice`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
       if (!response.ok) {
         throw new Error('Failed to generate invoice');
       }
-      
+
       // Convert the response to a blob
       const blob = await response.blob();
-      
+
       // Create a URL for the blob
       const url = window.URL.createObjectURL(blob);
-      
+
       // Create a temporary link element
       const link = document.createElement('a');
       link.href = url;
       link.download = `invoice-${orderId}.pdf`;
-      
+
       // Append the link to the body
       document.body.appendChild(link);
-      
+
       // Click the link to trigger the download
       link.click();
-      
+
       // Clean up
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       toast.dismiss();
       toast.success('Invoice downloaded successfully');
     } catch (error) {
@@ -180,7 +225,7 @@ export default function OrdersPage() {
           <div className="bg-red-50 p-4 rounded-lg text-center">
             <FaExclamationCircle className="text-red-500 text-3xl mx-auto mb-2" />
             <p className="text-red-700">{error}</p>
-            <button 
+            <button
               onClick={fetchOrders}
               className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
             >
@@ -192,7 +237,7 @@ export default function OrdersPage() {
             <FaHistory className="text-gray-400 text-4xl mx-auto mb-4" />
             <h3 className="text-xl font-medium text-gray-700 mb-2">No orders found</h3>
             <p className="text-gray-500 mb-4">You haven't made any purchases yet.</p>
-            <button 
+            <button
               onClick={() => router.push('/services')}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
@@ -327,7 +372,7 @@ export default function OrdersPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="mt-6 flex justify-end">
                   {selectedOrder.paymentStatus === 'paid' && (
                     <button

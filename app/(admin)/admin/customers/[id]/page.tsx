@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   FaUser,
@@ -14,7 +14,7 @@ import {
   FaHistory,
   FaCheck,
   FaTimes,
-  FaClock
+  FaClock,
 } from "react-icons/fa";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
@@ -41,8 +41,8 @@ interface Booking {
   service: string;
   date: string;
   time?: string;
-  status: string;
-  paymentStatus: string;
+  status: "pending" | "confirmed" | "completed" | "cancelled";
+  paymentStatus: "pending" | "paid" | "failed";
   amount: number;
   createdAt: string;
 }
@@ -59,9 +59,12 @@ export default function CustomerDetailPage() {
   const [processingBooking, setProcessingBooking] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!customerId) return;
+    if (!customerId) {
+      setError("Invalid customer ID");
+      setLoading(false);
+      return;
+    }
 
-    // Define the function inside useEffect to avoid dependency issues
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -69,12 +72,13 @@ export default function CustomerDetailPage() {
 
         const token = localStorage.getItem("token");
         if (!token) {
-          setError("Authentication token not found");
+          toast.error("Please log in to view customer details");
+          router.push("/admin/login");
           return;
         }
 
         // Fetch customer details
-        const response = await fetch(`/api/admin/customers/${customerId}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/customers/${customerId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -82,56 +86,63 @@ export default function CustomerDetailPage() {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to fetch customer details");
+          throw new Error(errorData.message || `Failed to fetch customer details: ${response.status}`);
         }
 
         const data = await response.json();
 
-        if (data.success) {
+        if (data.success && data.customer) {
           setCustomer(data.customer);
 
           // Fetch customer bookings
-          const bookingsResponse = await fetch(`/api/admin/customers/${customerId}/bookings`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-
-          if (bookingsResponse.ok) {
-            const bookingsData = await bookingsResponse.json();
-            if (bookingsData.success) {
-              setBookings(bookingsData.bookings);
+          const bookingsResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/customers/${customerId}/bookings`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
             }
+          );
+
+          if (!bookingsResponse.ok) {
+            throw new Error(`Failed to fetch bookings: ${bookingsResponse.status}`);
+          }
+
+          const bookingsData = await bookingsResponse.json();
+          if (bookingsData.success && Array.isArray(bookingsData.bookings)) {
+            setBookings(bookingsData.bookings);
+          } else {
+            throw new Error("Invalid bookings response format");
           }
         } else {
-          throw new Error(data.message || "Failed to fetch customer details");
+          throw new Error(data.message || "Invalid customer data");
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error fetching customer details:", error);
-        setError(error.message || "Failed to fetch customer details");
-        toast.error(error.message || "Failed to fetch customer details");
+        setError(error instanceof Error ? error.message : "Failed to fetch customer details");
+        toast.error(error instanceof Error ? error.message : "Failed to fetch customer details");
       } finally {
         setLoading(false);
       }
     };
 
-    // Call the function
     fetchData();
-  }, [customerId]);
+  }, [customerId, router]);
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  const formatDate = useMemo(
+    () => (dateString: string | null) => {
+      if (!dateString) return "N/A";
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    },
+    []
+  );
 
-  const getStatusColor = (status: string | undefined) => {
-    if (!status) return "bg-gray-100 text-gray-800";
-
+  const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "pending":
         return "bg-yellow-100 text-yellow-800";
@@ -146,9 +157,7 @@ export default function CustomerDetailPage() {
     }
   };
 
-  const getPaymentStatusColor = (status: string | undefined) => {
-    if (!status) return "bg-gray-100 text-gray-800";
-
+  const getPaymentStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "paid":
         return "bg-green-100 text-green-800";
@@ -161,16 +170,18 @@ export default function CustomerDetailPage() {
     }
   };
 
-  const handleStatusChange = async (bookingId: string, newStatus: string) => {
+  const handleStatusChange = async (bookingId: string, newStatus: "pending" | "completed" | "cancelled") => {
+    if (processingBooking) return; // Prevent multiple simultaneous requests
+
     try {
       setProcessingBooking(bookingId);
 
       const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error("Authentication token not found");
+        throw new Error("Authentication token not found. Please log in again.");
       }
 
-      const response = await fetch(`/api/admin/bookings/${bookingId}/status`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/bookings/${bookingId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -180,10 +191,8 @@ export default function CustomerDetailPage() {
       });
 
       if (!response.ok) {
-        // Check if response has content before trying to parse it
         const text = await response.text();
         let errorMessage = `Failed to update booking status to ${newStatus}`;
-
         if (text) {
           try {
             const errorData = JSON.parse(text);
@@ -192,22 +201,16 @@ export default function CustomerDetailPage() {
             console.error("Error parsing error response:", parseError);
           }
         }
-
         throw new Error(errorMessage);
       }
 
-      // Update the booking status in the state
-      setBookings(
-        bookings.map((booking) =>
-          booking._id === bookingId ? { ...booking, status: newStatus } : booking
-        )
+      setBookings((prev) =>
+        prev.map((booking) => (booking._id === bookingId ? { ...booking, status: newStatus } : booking))
       );
-
       toast.success(`Booking status updated to ${newStatus}`);
-
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating booking status:", error);
-      toast.error(error.message || "Failed to update booking status");
+      toast.error(error instanceof Error ? error.message : "Failed to update booking status");
     } finally {
       setProcessingBooking(null);
     }
@@ -226,8 +229,17 @@ export default function CustomerDetailPage() {
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
         <div className="flex">
           <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            <svg
+              className="h-5 w-5 text-red-400"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
             </svg>
           </div>
           <div className="ml-3">
@@ -238,7 +250,7 @@ export default function CustomerDetailPage() {
             <div className="mt-4">
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={() => router.push("/admin/customers")}
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 <FaArrowLeft className="mr-2" /> Go Back
@@ -254,7 +266,7 @@ export default function CustomerDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push("/admin/customers")}
           className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
           <FaArrowLeft className="mr-2" /> Back to Customers
@@ -325,15 +337,15 @@ export default function CustomerDetailPage() {
                   <div className="text-sm font-medium text-gray-500">Total Spent</div>
                   <div className="mt-1 flex items-baseline">
                     <FaRupeeSign className="text-gray-500" />
-                    <div className="text-2xl font-semibold text-gray-900">{customer.stats.totalSpent.toLocaleString()}</div>
+                    <div className="text-2xl font-semibold text-gray-900">
+                      {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0 }).format(customer.stats.totalSpent)}
+                    </div>
                   </div>
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                   <div className="text-sm font-medium text-gray-500">Last Booking</div>
                   <div className="mt-1">
-                    <div className="text-sm font-medium text-gray-900">
-                      {customer.stats.lastBookingDate ? formatDate(customer.stats.lastBookingDate) : "Never"}
-                    </div>
+                    <div className="text-sm font-medium text-gray-900">{formatDate(customer.stats.lastBookingDate)}</div>
                   </div>
                 </div>
               </div>
@@ -364,22 +376,40 @@ export default function CustomerDetailPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
                     Service
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
                     Date & Time
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
                     Status
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
                     Payment
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
                     Amount
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
                     Actions
                   </th>
                 </tr>
@@ -389,30 +419,34 @@ export default function CustomerDetailPage() {
                   <tr key={booking._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{booking.service}</div>
-                      <div className="text-sm text-gray-500">ID: {booking.bookingId || booking._id}</div>
+                      <div className="text-sm text-gray-500">ID: {booking.bookingId || booking._id.substring(0, 8)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{formatDate(booking.date)}</div>
                       <div className="text-sm text-gray-500">{booking.time || "N/A"}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(booking.status)}`}>
-                        {booking.status
-                          ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1)
-                          : "Unknown"}
+                      <span
+                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                          booking.status
+                        )}`}
+                      >
+                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPaymentStatusColor(booking.paymentStatus)}`}>
-                        {booking.paymentStatus
-                          ? booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)
-                          : "Unknown"}
+                      <span
+                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPaymentStatusColor(
+                          booking.paymentStatus
+                        )}`}
+                      >
+                        {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <FaRupeeSign className="mr-1" />
-                        {booking.amount ? booking.amount.toLocaleString() : "0"}
+                        {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0 }).format(booking.amount)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -431,7 +465,6 @@ export default function CustomerDetailPage() {
                             )}
                           </button>
                         )}
-
                         {booking.status !== "pending" && (
                           <button
                             onClick={() => handleStatusChange(booking._id, "pending")}
@@ -446,7 +479,6 @@ export default function CustomerDetailPage() {
                             )}
                           </button>
                         )}
-
                         {booking.status !== "cancelled" && (
                           <button
                             onClick={() => handleStatusChange(booking._id, "cancelled")}

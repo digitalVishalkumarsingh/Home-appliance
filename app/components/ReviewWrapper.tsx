@@ -29,13 +29,13 @@ const ReviewWrapper: React.FC<ReviewWrapperProps> = () => {
     '/services',            // Services main page
     '/acrepair',            // AC repair service page
     '/refrigeratorrepair',  // Refrigerator repair service page
-    '/washingmachinerepair' // Washing machine repair service page
+    '/washingmachine' // Washing machine repair service page
   ];
 
   // Check if the current path starts with any of the service detail paths
   const isServiceDetailPage = pathname?.startsWith('/acrepair/') ||
                              pathname?.startsWith('/refrigeratorrepair/') ||
-                             pathname?.startsWith('/washingmachinerepair/') ||
+                             pathname?.startsWith('/washingmachine/') ||
                              false;
 
   // Determine if the ReviewCarousel should be shown

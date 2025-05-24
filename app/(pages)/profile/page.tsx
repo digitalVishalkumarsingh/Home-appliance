@@ -1,24 +1,33 @@
 'use client';
 
+// User Profile Page - Next.js 15 Compatible
+// Handles user profile display and updates with backend API integration
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import OrderHistory from '@/app/components/OrderHistory';
 import AdminRedirect from '@/app/components/AdminRedirect';
+import useAuth from '@/app/hooks/useAuth';
 
 interface UserProfile {
+  _id?: string;
   name: string;
   email: string;
   phone: string;
   address: string;
   profileImage?: string;
+  role?: string;
+  createdAt?: string;
 }
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { user: authUser, isAuthenticated, isLoading: authLoading, logout: authLogout, syncTokenFromCookies } = useAuth();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'orders'
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UserProfile>({
@@ -29,35 +38,110 @@ export default function ProfilePage() {
     profileImage: ''
   });
 
-  useEffect(() => {
-    // Check if user is logged in
-    const checkAuth = () => {
-      try {
-        const userJson = localStorage.getItem('user');
-        if (!userJson) {
-          router.push('/login');
+  // Fetch user profile from API
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/user/profile', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          authLogout();
           return;
         }
-
-        const userData = JSON.parse(userJson);
-        setUser(userData);
-        setFormData({
-          name: userData.name || '',
-          email: userData.email || '',
-          phone: userData.phone || '',
-          address: userData.address || '',
-          profileImage: userData.profileImage || ''
-        });
-      } catch (error) {
-        console.error('Error checking auth:', error);
-        router.push('/login');
-      } finally {
-        setLoading(false);
+        throw new Error(`Failed to fetch profile: ${response.status}`);
       }
-    };
 
-    checkAuth();
-  }, [router]);
+      const data = await response.json();
+
+      if (data.success && data.user) {
+        setUser(data.user);
+        setFormData({
+          name: data.user.name || '',
+          email: data.user.email || '',
+          phone: data.user.phone || '',
+          address: data.user.address || '',
+          profileImage: data.user.profileImage || ''
+        });
+      } else {
+        throw new Error(data.message || 'Failed to fetch profile');
+      }
+    } catch (error: any) {
+      console.error('Error fetching user profile:', error);
+      toast.error(error.message || 'Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Debug authentication state
+    console.log('Profile page - Auth state:', {
+      authLoading,
+      isAuthenticated,
+      authUser: authUser ? {
+        email: authUser.email,
+        role: authUser.role,
+        userId: authUser.userId
+      } : null,
+      localStorage_token: typeof window !== 'undefined' ? !!localStorage.getItem('token') : 'N/A',
+      localStorage_user: typeof window !== 'undefined' ? !!localStorage.getItem('user') : 'N/A'
+    });
+
+    // Wait for auth to initialize
+    if (authLoading) {
+      console.log('Profile page - Still loading auth...');
+      return;
+    }
+
+    // Redirect if not authenticated
+    if (!isAuthenticated || !authUser) {
+      console.log('Profile page - Not authenticated, trying to sync token from cookies');
+      const hasToken = syncTokenFromCookies();
+
+      if (!hasToken) {
+        console.log('Profile page - No token found, redirecting to login');
+        router.push('/login');
+        return;
+      } else {
+        console.log('Profile page - Token found, waiting for authentication to complete');
+        // Token was found, wait for the auth hook to process it
+        return;
+      }
+    }
+
+    // Redirect admin users
+    if (authUser.role === 'admin') {
+      console.log('Profile page - Admin user, redirecting to admin dashboard');
+      router.push('/admin/dashboard');
+      return;
+    }
+
+    // Redirect technician users
+    if (authUser.role === 'technician') {
+      console.log('Profile page - Technician user, redirecting to technician dashboard');
+      router.push('/technician/dashboard');
+      return;
+    }
+
+    console.log('Profile page - Regular user, fetching profile');
+    // Fetch profile for regular users
+    fetchUserProfile();
+  }, [authLoading, isAuthenticated, authUser, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -67,44 +151,97 @@ export default function ProfilePage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (updating) return; // Prevent double submission
+
     try {
-      // Update user in localStorage
-      const updatedUser = {
-        ...user,
-        ...formData
+      setUpdating(true);
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        toast.error('Session expired. Please log in again.');
+        authLogout();
+        return;
+      }
+
+      // Validate form data
+      if (!formData.name || !formData.name.trim()) {
+        toast.error('Name is required');
+        return;
+      }
+
+      // Always send all fields, fallback to empty string if undefined
+      const payload = {
+        name: formData.name?.trim() || '',
+        phone: formData.phone?.trim() || '',
+        address: formData.address?.trim() || '',
+        profileImage: formData.profileImage?.trim() || ''
       };
 
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      setIsEditing(false);
-      toast.success('Profile updated successfully');
-    } catch (error) {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          authLogout();
+          return;
+        }
+        let errorMsg = 'Failed to update profile';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.message || errorMsg;
+        } catch {}
+        throw new Error(errorMsg + ` (Status: ${response.status})`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.user) {
+        // Update local state
+        setUser(data.user);
+        setFormData({
+          name: data.user.name || '',
+          email: data.user.email || '',
+          phone: data.user.phone || '',
+          address: data.user.address || '',
+          profileImage: data.user.profileImage || ''
+        });
+        setIsEditing(false);
+        toast.success('Profile updated successfully');
+      } else {
+        throw new Error(data.message || 'Failed to update profile');
+      }
+    } catch (error: any) {
       console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      toast.error(error?.message || 'Failed to update profile');
+    } finally {
+      setUpdating(false);
     }
   };
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem('user');
-      toast.success('Logged out successfully');
-      router.push('/');
-    } catch (error) {
-      console.error('Error logging out:', error);
-      toast.error('Failed to log out');
-    }
+    authLogout();
   };
 
   // Add AdminRedirect to prevent admin users from accessing this page
   return (
     <>
       <AdminRedirect />
-      {loading ? (
+      {(authLoading || loading) ? (
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your profile...</p>
+          </div>
         </div>
       ) : !user ? (
         <div className="min-h-screen flex items-center justify-center">
@@ -250,15 +387,24 @@ export default function ProfilePage() {
                       <button
                         type="button"
                         onClick={() => setIsEditing(false)}
-                        className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                        disabled={updating}
+                        className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        disabled={updating}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                       >
-                        Save Changes
+                        {updating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                            Updating...
+                          </>
+                        ) : (
+                          'Save Changes'
+                        )}
                       </button>
                     </div>
                   </form>

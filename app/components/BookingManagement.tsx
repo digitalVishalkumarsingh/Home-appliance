@@ -9,7 +9,7 @@ interface BookingManagementProps {
   orderId: string;
   currentDate?: string;
   currentTime?: string;
-  status: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   onRescheduleSuccess: () => void;
   onCancelSuccess: () => void;
 }
@@ -17,16 +17,16 @@ interface BookingManagementProps {
 const BookingManagement: React.FC<BookingManagementProps> = ({
   bookingId,
   orderId,
-  currentDate,
-  currentTime,
+  currentDate = '',
+  currentTime = '',
   status,
   onRescheduleSuccess,
   onCancelSuccess
 }) => {
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [newDate, setNewDate] = useState(currentDate || '');
-  const [newTime, setNewTime] = useState(currentTime || '');
+  const [newDate, setNewDate] = useState(currentDate);
+  const [newTime, setNewTime] = useState(currentTime);
   const [cancelReason, setCancelReason] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -35,7 +35,9 @@ const BookingManagement: React.FC<BookingManagementProps> = ({
   const minDate = today.toISOString().split('T')[0];
 
   // Calculate maximum date (3 months from now)
-  const maxDate = new Date(today.setMonth(today.getMonth() + 3)).toISOString().split('T')[0];
+  const maxDateObj = new Date(today);
+  maxDateObj.setMonth(today.getMonth() + 3);
+  const maxDate = maxDateObj.toISOString().split('T')[0];
 
   const handleReschedule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,13 +144,13 @@ const BookingManagement: React.FC<BookingManagementProps> = ({
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => setIsRescheduling(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex-1"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 w-full sm:w-auto"
             >
               Reschedule
             </button>
             <button
               onClick={() => setIsCancelling(true)}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex-1"
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 w-full sm:w-auto"
             >
               Cancel Booking
             </button>
@@ -159,9 +161,15 @@ const BookingManagement: React.FC<BookingManagementProps> = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
+            aria-busy={loading}
           >
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">New Date</label>
+              <label 
+                id="new-date-label"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                New Date
+              </label>
               <input
                 type="date"
                 value={newDate}
@@ -170,15 +178,22 @@ const BookingManagement: React.FC<BookingManagementProps> = ({
                 max={maxDate}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                aria-labelledby="new-date-label"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">New Time</label>
+              <label 
+                id="new-time-label"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                New Time
+              </label>
               <select
                 value={newTime}
                 onChange={(e) => setNewTime(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                aria-labelledby="new-time-label"
               >
                 <option value="">Select a time</option>
                 <option value="09:00 AM">09:00 AM</option>
@@ -208,7 +223,13 @@ const BookingManagement: React.FC<BookingManagementProps> = ({
               >
                 {loading ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg 
+                      className="animate-spin mr-2 h-4 w-4 text-white" 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      fill="none" 
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -224,9 +245,15 @@ const BookingManagement: React.FC<BookingManagementProps> = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
+            aria-busy={loading}
           >
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Cancellation</label>
+              <label 
+                id="cancel-reason-label"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Reason for Cancellation
+              </label>
               <textarea
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
@@ -234,6 +261,7 @@ const BookingManagement: React.FC<BookingManagementProps> = ({
                 rows={3}
                 required
                 placeholder="Please provide a reason for cancelling this booking"
+                aria-labelledby="cancel-reason-label"
               ></textarea>
             </div>
             <div className="flex justify-end space-x-3 pt-2">
@@ -252,7 +280,13 @@ const BookingManagement: React.FC<BookingManagementProps> = ({
               >
                 {loading ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg 
+                      className="animate-spin mr-2 h-4 w-4 text-white" 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      fill="none" 
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>

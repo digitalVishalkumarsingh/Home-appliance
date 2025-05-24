@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { FaCog, FaSpinner, FaUser, FaBell, FaLock, FaShieldAlt, FaCheck, FaExclamationCircle } from 'react-icons/fa';
+import Link from 'next/link';
+
+import {  FaSpinner, FaBell, FaLock, FaShieldAlt, FaCheck, FaExclamationCircle } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import useAuth from '@/app/hooks/useAuth';
 import AdminRedirect from '@/app/components/AdminRedirect';
@@ -23,7 +24,7 @@ interface UserSettings {
 }
 
 export default function SettingsPage() {
-  const { user, isAuthenticated, isLoading, updateUser } = useAuth();
+  const { user, isAuthenticated, isLoading, syncTokenFromCookies } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('notifications'); // 'notifications', 'privacy', 'security'
   const [settings, setSettings] = useState<UserSettings>({
@@ -42,7 +43,7 @@ export default function SettingsPage() {
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Password change form
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -50,30 +51,76 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast.error('Please log in to access settings');
-      router.push('/login');
+    console.log('Settings - Auth state:', { isLoading, isAuthenticated, hasUser: !!user });
+
+    // Don't redirect while still loading
+    if (isLoading) {
+      console.log('Settings - Still loading, waiting...');
       return;
     }
 
-    if (isAuthenticated && user) {
-      fetchSettings();
+    // If not authenticated, try to sync token from cookies first
+    if (!isAuthenticated || !user) {
+      console.log('Settings - Not authenticated, trying to sync token from cookies');
+      const hasToken = syncTokenFromCookies();
+
+      if (!hasToken) {
+        console.log('Settings - No token found, redirecting to login');
+        toast.error('Please log in to access settings');
+        router.push('/login');
+        return;
+      } else {
+        console.log('Settings - Token found, waiting for authentication to complete');
+        // Token was found, wait for the auth hook to process it
+        return;
+      }
     }
-  }, [isAuthenticated, isLoading, user, router]);
+
+    // User is authenticated, fetch settings
+    console.log('Settings - User authenticated, fetching settings');
+    fetchSettings();
+  }, [isAuthenticated, isLoading, user, router, syncTokenFromCookies]);
 
   const fetchSettings = async () => {
     try {
       setIsLoadingSettings(true);
       setError(null);
 
-      const response = await fetch('/api/user/settings');
-      
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Settings - No token found in localStorage');
+        toast.error('Authentication token not found. Please log in again.');
+        router.push('/login');
+        return;
+      }
+
+      console.log('Settings - Fetching settings with token');
+      const response = await fetch('/api/user/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Settings - API response:', { status: response.status, ok: response.ok });
+
       if (!response.ok) {
-        throw new Error('Failed to fetch settings');
+        if (response.status === 401) {
+          console.error('Settings - 401 Unauthorized, clearing auth and redirecting');
+          // Clear authentication data
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          toast.error('Session expired. Please log in again.');
+          router.push('/login');
+          return;
+        }
+        throw new Error(`Failed to fetch settings: ${response.status}`);
       }
 
       const data = await response.json();
-      
+      console.log('Settings - API data:', { success: data.success, hasSettings: !!data.settings });
+
       if (data.success) {
         setSettings(data.settings || {
           notificationPreferences: {
@@ -93,7 +140,15 @@ export default function SettingsPage() {
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError('Failed to load your settings. Please try again later.');
+
+      // If it's an authentication error, redirect to login
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        router.push('/login');
+      }
     } finally {
       setIsLoadingSettings(false);
     }
@@ -104,9 +159,16 @@ export default function SettingsPage() {
       setIsSaving(true);
       setError(null);
 
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await fetch('/api/user/settings', {
         method: 'PUT',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ settings }),
@@ -117,7 +179,7 @@ export default function SettingsPage() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success('Settings saved successfully');
       } else {
@@ -147,12 +209,34 @@ export default function SettingsPage() {
       return;
     }
 
+    // Check password strength
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasLowerCase = /[a-z]/.test(newPassword);
+    const hasNumbers = /\d/.test(newPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumbers) {
+      setPasswordError('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+      return;
+    }
+
     try {
       setIsSaving(true);
 
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Settings - No token found for password change');
+        toast.error('Authentication token not found. Please log in again.');
+        router.push('/login');
+        return;
+      }
+
+      console.log('Settings - Changing password');
       const response = await fetch('/api/user/change-password', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -161,25 +245,38 @@ export default function SettingsPage() {
         }),
       });
 
+      console.log('Settings - Password change response:', { status: response.status, ok: response.ok });
+
       if (!response.ok) {
+        if (response.status === 401) {
+          console.error('Settings - 401 Unauthorized during password change');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          toast.error('Session expired. Please log in again.');
+          router.push('/login');
+          return;
+        }
         const data = await response.json();
         throw new Error(data.message || 'Failed to change password');
       }
 
       const data = await response.json();
-      
+      console.log('Settings - Password change data:', { success: data.success });
+
       if (data.success) {
         toast.success('Password changed successfully');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
+        setPasswordError(null);
       } else {
         throw new Error(data.message || 'Failed to change password');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error changing password:', error);
-      setPasswordError(error.message || 'Failed to change password');
-      toast.error(error.message || 'Failed to change password');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to change password';
+      setPasswordError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -509,6 +606,20 @@ export default function SettingsPage() {
                         required
                         minLength={8}
                       />
+                      {newPassword && (
+                        <div className="mt-2">
+                          <div className="text-xs text-gray-600 mb-1">Password strength:</div>
+                          <div className="flex space-x-1">
+                            <div className={`h-1 w-1/4 rounded ${newPassword.length >= 8 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                            <div className={`h-1 w-1/4 rounded ${/[A-Z]/.test(newPassword) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                            <div className={`h-1 w-1/4 rounded ${/[a-z]/.test(newPassword) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                            <div className={`h-1 w-1/4 rounded ${/\d/.test(newPassword) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Must contain: 8+ characters, uppercase, lowercase, number
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">
@@ -557,8 +668,8 @@ export default function SettingsPage() {
 
                   <div className="mt-8 pt-8 border-t border-gray-200">
                     <h3 className="text-md font-medium text-gray-900 mb-4">Account Security</h3>
-                    
-                    <div className="bg-yellow-50 p-4 rounded-md">
+
+                    <div className="bg-yellow-50 p-4 rounded-md mb-6">
                       <div className="flex">
                         <FaExclamationCircle className="h-5 w-5 text-yellow-400 mr-2" />
                         <div>
@@ -567,6 +678,23 @@ export default function SettingsPage() {
                             For your security, we recommend changing your password regularly and using a strong, unique password.
                           </p>
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 p-4 rounded-md">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-medium text-blue-900">Forgot Your Password?</h4>
+                          <p className="text-sm text-blue-700 mt-1">
+                            If you can't remember your current password, you can reset it using your email.
+                          </p>
+                        </div>
+                        <Link
+                          href="/forgot-password"
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                        >
+                          Reset Password
+                        </Link>
                       </div>
                     </div>
                   </div>

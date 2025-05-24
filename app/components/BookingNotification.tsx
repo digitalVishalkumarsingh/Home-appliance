@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCalendarCheck, FaTimes } from '@/app/components/icons';
+import { FaCalendarCheck, FaTimes } from 'react-icons/fa';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -10,10 +10,14 @@ interface Notification {
   _id: string;
   title: string;
   message: string;
-  type: string;
+  type: 'booking';
   referenceId?: string;
   isRead: boolean;
   createdAt: string;
+}
+
+interface User {
+  role?: string;
 }
 
 export default function BookingNotification() {
@@ -22,9 +26,30 @@ export default function BookingNotification() {
   const [showNotification, setShowNotification] = useState(false);
   const router = useRouter();
 
+  // Check if user is technician or admin
+  const [isSpecialUser, setIsSpecialUser] = useState(false);
+
+  useEffect(() => {
+    // Check if user is logged in and is a technician or admin
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const userData: User = JSON.parse(userStr);
+        if (userData.role === 'technician' || userData.role === 'admin') {
+          setIsSpecialUser(true);
+        }
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+      }
+    }
+  }, []);
+
   // Fetch recent booking notifications
   const fetchBookingNotifications = async () => {
     try {
+      // Don't fetch notifications for technicians and admins
+      if (isSpecialUser) return;
+
       const token = localStorage.getItem('token');
       if (!token) return;
 
@@ -100,7 +125,7 @@ export default function BookingNotification() {
     // Navigate to booking details if referenceId exists
     if (currentNotification.referenceId) {
       router.push(`/bookings/${currentNotification.referenceId}`);
-    } else if (currentNotification.type === 'booking') {
+    } else {
       // Try to extract booking ID from the message if possible
       const bookingIdMatch = currentNotification.message.match(/booking (?:ID )?(BK\d+)/i);
       if (bookingIdMatch && bookingIdMatch[1]) {
@@ -108,8 +133,6 @@ export default function BookingNotification() {
       } else {
         router.push('/bookings');
       }
-    } else {
-      router.push('/bookings');
     }
   };
 
@@ -131,13 +154,16 @@ export default function BookingNotification() {
 
   // Poll for new notifications
   useEffect(() => {
+    // Don't set up polling for technicians and admins
+    if (isSpecialUser) return;
+
     fetchBookingNotifications();
 
     // Poll every 30 seconds
     const intervalId = setInterval(fetchBookingNotifications, 30000);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isSpecialUser]);
 
   // Auto-hide notification after 10 seconds
   useEffect(() => {
@@ -150,7 +176,8 @@ export default function BookingNotification() {
     }
   }, [showNotification, currentNotification]);
 
-  if (!currentNotification) return null;
+  // Don't show notifications for technicians and admins
+  if (isSpecialUser || !currentNotification) return null;
 
   return (
     <AnimatePresence>
@@ -160,8 +187,11 @@ export default function BookingNotification() {
           animate={{ opacity: 1, y: 0, x: '-50%' }}
           exit={{ opacity: 0, y: -50, x: '-50%' }}
           transition={{ duration: 0.3 }}
-          className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-md w-full"
           onClick={handleNotificationClick}
+          role="alert"
+          aria-live="polite"
+          tabIndex={0}
         >
           <div className="bg-white rounded-lg shadow-xl overflow-hidden border border-blue-200 cursor-pointer">
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 flex justify-between items-center">
@@ -171,7 +201,7 @@ export default function BookingNotification() {
               </div>
               <button
                 onClick={handleClose}
-                className="text-white hover:text-gray-200 focus:outline-none"
+                className="text-white hover:text-gray-300 focus:outline-none"
                 aria-label="Close notification"
               >
                 <FaTimes />

@@ -22,6 +22,14 @@ export default function NotificationBadge() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(true);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      setIsMounted(false);
+    };
+  }, []);
 
   // Fetch notifications when user is authenticated
   useEffect(() => {
@@ -30,17 +38,50 @@ export default function NotificationBadge() {
     }
   }, [isAuthenticated, user]);
 
+  // Get token with fallback to cookies
+  const getToken = (): string | null => {
+    if (typeof window === "undefined") return null;
+
+    // First try localStorage
+    let token = localStorage.getItem("token");
+    if (token) {
+      return token;
+    }
+
+    // If not in localStorage, try to get from cookies as fallback
+    try {
+      const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+      const tokenCookie = cookies.find(cookie => cookie.startsWith('token='));
+      if (tokenCookie) {
+        token = tokenCookie.split('=')[1];
+        if (token) {
+          // Sync to localStorage for future use
+          localStorage.setItem("token", token);
+          return token;
+        }
+      }
+    } catch (error) {
+      console.debug("Error reading cookies:", error);
+    }
+
+    return null;
+  };
+
   // Fetch notifications from API
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
+      const token = getToken();
 
-      if (!token) return;
+      if (!token) {
+        console.debug("No token available for fetching notifications");
+        return;
+      }
 
       const response = await fetch("/api/user/notifications?limit=5", {
         headers: {
           Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
@@ -57,24 +98,33 @@ export default function NotificationBadge() {
       }
 
       const data = await response.json();
-      setNotifications(data.notifications || []);
-      setUnreadCount(data.unreadCount || 0);
+      if (isMounted) {
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unreadCount || 0);
+      }
     } catch (error) {
       console.error("Error fetching notifications:", error);
       // Don't show any error to the user, just clear notifications
-      setNotifications([]);
-      setUnreadCount(0);
+      if (isMounted) {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     }
   };
 
   // Mark notifications as read
   const markAsRead = async (notificationId?: string) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
 
-      if (!token) return;
+      if (!token) {
+        console.debug("No token available for marking notifications as read");
+        return;
+      }
 
       const response = await fetch("/api/user/notifications/read", {
         method: "POST",
@@ -89,27 +139,40 @@ export default function NotificationBadge() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to mark notifications as read");
+        if (response.status === 401) {
+          console.debug("Token expired while marking notifications as read");
+          return;
+        }
+        throw new Error(`Failed to mark notifications as read: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || "Failed to mark notifications as read");
       }
 
       // Update local state
-      if (notificationId) {
-        setNotifications((prev) =>
-          prev.map((notification) =>
-            notification._id === notificationId
-              ? { ...notification, isRead: true }
-              : notification
-          )
-        );
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-      } else {
-        setNotifications((prev) =>
-          prev.map((notification) => ({ ...notification, isRead: true }))
-        );
-        setUnreadCount(0);
+      if (isMounted) {
+        if (notificationId) {
+          setNotifications((prev) =>
+            prev.map((notification) =>
+              notification._id === notificationId
+                ? { ...notification, isRead: true }
+                : notification
+            )
+          );
+          setUnreadCount((prev) => Math.max(0, prev - 1));
+        } else {
+          setNotifications((prev) =>
+            prev.map((notification) => ({ ...notification, isRead: true }))
+          );
+          setUnreadCount(0);
+        }
       }
     } catch (error) {
       console.error("Error marking notifications as read:", error);
+      // Don't show error to user for notification marking failures
+      // as it's not critical functionality
     }
   };
 
@@ -182,7 +245,7 @@ export default function NotificationBadge() {
     <div className="relative">
       <button
         onClick={toggleNotifications}
-        className="relative p-1 rounded-full text-gray-600 hover:text-gray-800 focus:outline-none"
+        className="relative p-1 rounded-full text-white/90 hover:text-white focus:outline-none transition-colors duration-200"
         aria-label="Notifications"
       >
         <FaBell className="h-6 w-6" />

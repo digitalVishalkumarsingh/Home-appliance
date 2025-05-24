@@ -1,9 +1,10 @@
+// app/components/FirstTimeBookingNotification.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaGift, FaTimes } from "react-icons/fa";
-import useAuth from "@/app/hooks/useAuth";
+import useAuth from "../hooks/useAuth";
 
 export default function FirstTimeBookingNotification() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -11,10 +12,8 @@ export default function FirstTimeBookingNotification() {
   const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
-    // Only check for first-time notification if the user is authenticated and not an admin
     if (isAuthenticated && !isLoading && user && !hasChecked) {
-      // Skip for admin users
-      if (user.role === 'admin') {
+      if (user.role === "admin" || user.role === "technician") {
         return;
       }
 
@@ -25,25 +24,20 @@ export default function FirstTimeBookingNotification() {
 
   const checkFirstTimeBookingEligibility = async () => {
     try {
-      const response = await fetch("/api/special-offers/first-time", {
-        headers: {
-          // The token will be sent automatically via cookies
-        }
-      });
+      const response = await fetch("/api/special-offers/first-time");
 
       if (!response.ok) {
+        console.error("Failed to fetch first-time offer eligibility:", response.statusText);
         return;
       }
 
       const data = await response.json();
 
       if (data.success && data.isEligible && data.offer) {
-        // Check if we've already shown this notification
         const notificationShown = localStorage.getItem("firstTimeOfferNotificationShown");
 
         if (!notificationShown) {
           setIsVisible(true);
-          // Mark as shown so we don't show it again
           localStorage.setItem("firstTimeOfferNotificationShown", "true");
         }
       }

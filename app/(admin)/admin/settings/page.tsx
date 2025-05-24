@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { FaSpinner, FaSave, FaGlobe, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCog, FaMoneyBillWave } from "react-icons/fa";
+import { useState, useEffect, useCallback } from "react";
+import { FaSpinner, FaSave, FaGlobe, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCog, FaMoneyBillWave, FaPercent, FaUserCog } from "react-icons/fa";
 import { toast } from "react-hot-toast";
+import Link from "next/link";
 
 interface Settings {
   _id?: string;
@@ -57,25 +58,22 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("general");
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       const token = localStorage.getItem("token");
       if (!token) {
-        setError("Authentication token not found");
-        return;
+        throw new Error("Authentication token not found");
       }
 
-      const response = await fetch("/api/admin/settings", {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "/api";
+      const response = await fetch(`${baseUrl}/admin/settings`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        cache: "no-store", // Ensure fresh data for serverless
       });
 
       if (!response.ok) {
@@ -84,36 +82,50 @@ export default function SettingsPage() {
       }
 
       const data = await response.json();
-
       if (data.success && data.settings) {
         setSettings(data.settings);
       } else {
         throw new Error(data.message || "Failed to fetch settings");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching settings:", error);
-      setError(error.message || "Failed to fetch settings");
-      toast.error(error.message || "Failed to fetch settings");
+      const message = error instanceof Error ? error.message : "Failed to fetch settings";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const { name, value } = e.target;
+      // Basic validation
+      if (name === "siteEmail" && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        return; // Skip invalid email
+      }
+      if (name === "contactPhone" && value && !/^\+?\d{10,15}$/.test(value)) {
+        return; // Skip invalid phone
+      }
+      if (name === "taxRate" && (parseFloat(value) < 0 || parseFloat(value) > 100)) {
+        return; // Skip invalid tax rate
+      }
+      setSettings((prev) => ({
+        ...prev,
+        [name]: name === "taxRate" ? parseFloat(value) || 0 : value,
+      }));
+    },
+    []
+  );
+
+  const handleServiceChargeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setSettings((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleServiceChargeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-
-    // Parse the value as a float, defaulting to 0 if invalid
     const numericValue = parseFloat(value) || 0;
-
-    // Update the settings state
+    if (numericValue < 0) return; // Prevent negative charges
     setSettings((prev) => ({
       ...prev,
       serviceCharges: {
@@ -121,11 +133,9 @@ export default function SettingsPage() {
         [name]: numericValue,
       },
     }));
+  }, []);
 
-    console.log(`Service charge updated: ${name} = ${numericValue}`);
-  };
-
-  const handleRazorpayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRazorpayChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setSettings((prev) => ({
       ...prev,
@@ -137,100 +147,88 @@ export default function SettingsPage() {
         },
       },
     }));
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    try {
-      setSaving(true);
+      try {
+        setSaving(true);
 
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("Authentication token not found");
-      }
-
-      // Log the settings being sent
-      console.log("Sending settings update:", JSON.stringify(settings, null, 2));
-
-      // Create a clean settings object to avoid any circular references
-      const cleanSettings = {
-        ...settings,
-        serviceCharges: {
-          acService: Number(settings.serviceCharges.acService),
-          washingMachineService: Number(settings.serviceCharges.washingMachineService),
-          refrigeratorService: Number(settings.serviceCharges.refrigeratorService),
-          microwaveService: Number(settings.serviceCharges.microwaveService),
-          tvService: Number(settings.serviceCharges.tvService),
-        },
-        taxRate: Number(settings.taxRate),
-        paymentGateway: {
-          razorpay: {
-            enabled: Boolean(settings.paymentGateway.razorpay.enabled),
-            keyId: String(settings.paymentGateway.razorpay.keyId || ""),
-            keySecret: String(settings.paymentGateway.razorpay.keySecret || ""),
-            webhookSecret: String(settings.paymentGateway.razorpay.webhookSecret || ""),
-          }
+        const token = localStorage.getItem("token");
+        if (!token) {
+          throw new Error("Authentication token not found");
         }
-      };
 
-      console.log("Clean settings object:", JSON.stringify(cleanSettings, null, 2));
+        // Validate required fields
+        if (!settings.siteName || !settings.siteEmail || !settings.contactPhone || !settings.address) {
+          throw new Error("Please fill in all required general settings");
+        }
 
-      const response = await fetch("/api/admin/settings", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(cleanSettings),
-      });
+        const cleanSettings = {
+          ...settings,
+          serviceCharges: {
+            acService: Number(settings.serviceCharges.acService) || 0,
+            washingMachineService: Number(settings.serviceCharges.washingMachineService) || 0,
+            refrigeratorService: Number(settings.serviceCharges.refrigeratorService) || 0,
+            microwaveService: Number(settings.serviceCharges.microwaveService) || 0,
+            tvService: Number(settings.serviceCharges.tvService) || 0,
+          },
+          taxRate: Number(settings.taxRate) || 0,
+          paymentGateway: {
+            razorpay: {
+              enabled: Boolean(settings.paymentGateway.razorpay.enabled),
+              keyId: String(settings.paymentGateway.razorpay.keyId || ""),
+              keySecret: String(settings.paymentGateway.razorpay.keySecret || ""),
+              webhookSecret: String(settings.paymentGateway.razorpay.webhookSecret || ""),
+            },
+          },
+        };
 
-      // Parse the response
-      const data = await response.json();
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "/api";
+        const response = await fetch(`${baseUrl}/admin/settings`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(cleanSettings),
+          cache: "no-store",
+        });
 
-      // Log the response for debugging
-      console.log("Settings update response:", data);
+        const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to update settings");
-      }
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to update settings");
+        }
 
-      if (data.success) {
-        setSettings(data.settings);
-
-        // Show success message
-        if (activeTab === "services") {
-          toast.success("Service charges updated successfully. All service prices have been updated.");
+        if (data.success) {
+          setSettings(data.settings);
+          toast.success(
+            activeTab === "services"
+              ? "Service charges updated successfully. All service prices have been updated."
+              : "Settings updated successfully"
+          );
         } else {
-          toast.success("Settings updated successfully");
+          throw new Error(data.message || "Failed to update settings");
         }
-      } else {
-        throw new Error(data.message || "Failed to update settings");
+      } catch (error) {
+        console.error("Error updating settings:", error);
+        const message = error instanceof Error ? error.message : "Failed to update settings";
+        toast.error(message);
+      } finally {
+        setSaving(false);
       }
-    } catch (error: any) {
-      console.error("Error updating settings:", error);
-
-      // Provide more detailed error message
-      let errorMessage = "Failed to update settings";
-
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = String((error as any).message);
-      }
-
-      toast.error(errorMessage);
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+    [settings, activeTab]
+  );
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <FaSpinner className="animate-spin h-8 w-8 text-blue-500" />
+        <FaSpinner className="animate-spin h-8 w-8 text-blue-500" aria-hidden="true" />
+        <span className="ml-2 text-gray-600">Loading settings...</span>
       </div>
     );
   }
@@ -240,7 +238,7 @@ export default function SettingsPage() {
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <div className="flex">
           <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
           </div>
@@ -248,6 +246,9 @@ export default function SettingsPage() {
             <h3 className="text-sm font-medium text-red-800">Error</h3>
             <div className="mt-2 text-sm text-red-700">
               <p>{error}</p>
+              <Link href="/admin/login" className="mt-2 inline-flex text-sm text-blue-600 hover:text-blue-800">
+                Go to Login
+              </Link>
             </div>
           </div>
         </div>
@@ -260,15 +261,31 @@ export default function SettingsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage application settings and configurations
-          </p>
+          <p className="mt-1 text-sm text-gray-500">Manage application settings and configurations</p>
+        </div>
+        <div className="mt-4 sm:mt-0 flex space-x-3">
+          <Link
+            href="/admin/settings/commission"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            aria-label="Go to technician commission settings"
+          >
+            <FaPercent className="mr-2 -ml-1 h-5 w-5" aria-hidden="true" />
+            Technician Commission
+          </Link>
+          <Link
+            href="/admin/technicians"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            aria-label="Go to manage technicians"
+          >
+            <FaUserCog className="mr-2 -ml-1 h-5 w-5 text-gray-500" aria-hidden="true" />
+            Manage Technicians
+          </Link>
         </div>
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
+          <nav className="flex -mb-px" role="tablist">
             <button
               onClick={() => setActiveTab("general")}
               className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
@@ -276,8 +293,11 @@ export default function SettingsPage() {
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
+              role="tab"
+              aria-selected={activeTab === "general"}
+              aria-controls="general-panel"
             >
-              <FaGlobe className="inline-block mr-2" />
+              <FaGlobe className="inline-block mr-2" aria-hidden="true" />
               General
             </button>
             <button
@@ -287,8 +307,11 @@ export default function SettingsPage() {
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
+              role="tab"
+              aria-selected={activeTab === "services"}
+              aria-controls="services-panel"
             >
-              <FaCog className="inline-block mr-2" />
+              <FaCog className="inline-block mr-2" aria-hidden="true" />
               Service Charges
             </button>
             <button
@@ -298,8 +321,11 @@ export default function SettingsPage() {
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
+              role="tab"
+              aria-selected={activeTab === "payment"}
+              aria-controls="payment-panel"
             >
-              <FaMoneyBillWave className="inline-block mr-2" />
+              <FaMoneyBillWave className="inline-block mr-2" aria-hidden="true" />
               Payment Gateway
             </button>
           </nav>
@@ -308,7 +334,7 @@ export default function SettingsPage() {
         <form onSubmit={handleSubmit}>
           <div className="px-4 py-5 sm:p-6">
             {activeTab === "general" && (
-              <div className="space-y-6">
+              <div className="space-y-6" id="general-panel" role="tabpanel">
                 <div>
                   <label htmlFor="siteName" className="block text-sm font-medium text-gray-700">
                     Site Name
@@ -321,6 +347,7 @@ export default function SettingsPage() {
                     onChange={handleInputChange}
                     required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-required="true"
                   />
                 </div>
                 <div>
@@ -335,6 +362,7 @@ export default function SettingsPage() {
                     onChange={handleInputChange}
                     required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-required="true"
                   />
                 </div>
                 <div>
@@ -349,20 +377,22 @@ export default function SettingsPage() {
                     onChange={handleInputChange}
                     required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-required="true"
                   />
                 </div>
                 <div>
                   <label htmlFor="address" className="block text-sm font-medium text-gray-700">
                     Address
                   </label>
-                  <input
-                    type="text"
+                    <textarea
                     name="address"
                     id="address"
                     value={settings.address}
                     onChange={handleInputChange}
                     required
+                    rows={4}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-required="true"
                   />
                 </div>
                 <div>
@@ -379,13 +409,17 @@ export default function SettingsPage() {
                     max="100"
                     step="0.01"
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-describedby="taxRate-description"
                   />
+                  <p id="taxRate-description" className="mt-1 text-xs text-gray-500">
+                    Enter the tax rate as a percentage (0-100).
+                  </p>
                 </div>
               </div>
             )}
 
             {activeTab === "services" && (
-              <div className="space-y-6">
+              <div className="space-y-6" id="services-panel" role="tabpanel">
                 <div>
                   <label htmlFor="acService" className="block text-sm font-medium text-gray-700">
                     AC Service Charge (₹)
@@ -399,7 +433,11 @@ export default function SettingsPage() {
                     min="0"
                     step="0.01"
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-describedby="acService-description"
                   />
+                  <p id="acService-description" className="mt-1 text-xs text-gray-500">
+                    Base charge for AC service.
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="washingMachineService" className="block text-sm font-medium text-gray-700">
@@ -414,7 +452,11 @@ export default function SettingsPage() {
                     min="0"
                     step="0.01"
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-describedby="washingMachineService-description"
                   />
+                  <p id="washingMachineService-description" className="mt-1 text-xs text-gray-500">
+                    Base charge for washing machine service.
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="refrigeratorService" className="block text-sm font-medium text-gray-700">
@@ -429,7 +471,11 @@ export default function SettingsPage() {
                     min="0"
                     step="0.01"
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-describedby="refrigeratorService-description"
                   />
+                  <p id="refrigeratorService-description" className="mt-1 text-xs text-gray-500">
+                    Base charge for refrigerator service.
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="microwaveService" className="block text-sm font-medium text-gray-700">
@@ -444,7 +490,11 @@ export default function SettingsPage() {
                     min="0"
                     step="0.01"
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-describedby="microwaveService-description"
                   />
+                  <p id="microwaveService-description" className="mt-1 text-xs text-gray-500">
+                    Base charge for microwave service.
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="tvService" className="block text-sm font-medium text-gray-700">
@@ -459,13 +509,17 @@ export default function SettingsPage() {
                     min="0"
                     step="0.01"
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-describedby="tvService-description"
                   />
+                  <p id="tvService-description" className="mt-1 text-xs text-gray-500">
+                    Base charge for TV service.
+                  </p>
                 </div>
               </div>
             )}
 
             {activeTab === "payment" && (
-              <div className="space-y-6">
+              <div className="space-y-6" id="payment-panel" role="tabpanel">
                 <div className="flex items-center">
                   <input
                     type="checkbox"
@@ -474,10 +528,14 @@ export default function SettingsPage() {
                     checked={settings.paymentGateway.razorpay.enabled}
                     onChange={handleRazorpayChange}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    aria-describedby="razorpayEnabled-description"
                   />
                   <label htmlFor="razorpayEnabled" className="ml-2 block text-sm font-medium text-gray-700">
                     Enable Razorpay
                   </label>
+                  <p id="razorpayEnabled-description" className="ml-2 text-xs text-gray-500">
+                    Toggle to enable or disable Razorpay payments.
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="keyId" className="block text-sm font-medium text-gray-700">
@@ -490,7 +548,11 @@ export default function SettingsPage() {
                     value={settings.paymentGateway.razorpay.keyId}
                     onChange={handleRazorpayChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-describedby="keyId-description"
                   />
+                  <p id="keyId-description" className="mt-1 text-xs text-gray-500">
+                    Public key for Razorpay integration.
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="keySecret" className="block text-sm font-medium text-gray-700">
@@ -503,7 +565,11 @@ export default function SettingsPage() {
                     value={settings.paymentGateway.razorpay.keySecret}
                     onChange={handleRazorpayChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-describedby="keySecret-description"
                   />
+                  <p id="keySecret-description" className="mt-1 text-xs text-gray-500">
+                    Secret key for Razorpay integration (kept hidden).
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="webhookSecret" className="block text-sm font-medium text-gray-700">
@@ -516,7 +582,11 @@ export default function SettingsPage() {
                     value={settings.paymentGateway.razorpay.webhookSecret}
                     onChange={handleRazorpayChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    aria-describedby="webhookSecret-description"
                   />
+                  <p id="webhookSecret-description" className="mt-1 text-xs text-gray-500">
+                    Secret for verifying Razorpay webhook payloads.
+                  </p>
                 </div>
               </div>
             )}
@@ -526,16 +596,17 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Save settings"
             >
               {saving ? (
                 <>
-                  <FaSpinner className="animate-spin mr-2 h-4 w-4" />
+                  <FaSpinner className="animate-spin mr-2 h-4 w-4" aria-hidden="true" />
                   Saving...
                 </>
               ) : (
                 <>
-                  <FaSave className="mr-2 h-4 w-4" />
+                  <FaSave className="mr-2 h-4 w-4" aria-hidden="true" />
                   Save Settings
                 </>
               )}

@@ -318,7 +318,17 @@ const OrderHistory: React.FC<OrderHistoryProps> = ({ userEmail }) => {
                     orderId={selectedOrder.orderId}
                     currentDate={selectedOrder.notes.bookingDate}
                     currentTime={selectedOrder.notes.bookingTime}
-                    status={selectedOrder.bookingStatus || selectedOrder.status}
+                    status={
+                      (['pending', 'confirmed', 'completed', 'cancelled'] as const).includes(
+                        (selectedOrder.bookingStatus || selectedOrder.status) as any
+                      )
+                        ? (selectedOrder.bookingStatus || selectedOrder.status) as
+                            | 'pending'
+                            | 'confirmed'
+                            | 'completed'
+                            | 'cancelled'
+                        : 'pending'
+                    }
                     onRescheduleSuccess={() => {
                       toast.success('Your booking has been rescheduled');
                       setShowOrderDetails(false);

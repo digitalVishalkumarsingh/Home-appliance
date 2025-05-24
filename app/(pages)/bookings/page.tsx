@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
-import { FaCalendarAlt, FaClock, FaMapMarkerAlt, FaRupeeSign, FaSpinner, FaSearch, FaEye, FaPrint } from 'react-icons/fa';
+import { FaCalendarAlt, FaClock, FaSpinner, FaSearch, FaEye } from 'react-icons/fa';
 import BookingManagement from '@/app/components/BookingManagement';
 import SimplePrintButton from '@/app/components/SimplePrintButton';
+import useAuth from '@/app/hooks/useAuth';
 
 interface Booking {
   _id: string;
@@ -43,6 +44,7 @@ interface Booking {
 }
 
 export default function UserBookingsPage() {
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,31 +58,37 @@ export default function UserBookingsPage() {
   const fetchBookings = async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      // Safely access localStorage only in browser environment
-      if (typeof window === 'undefined') {
-        return; // Exit early if running on server
-      }
-
+      // Get token from localStorage
       const token = localStorage.getItem('token');
-
       if (!token) {
-        router.push('/login?redirect=/bookings');
-        return;
+        throw new Error('No authentication token found');
       }
 
       const response = await fetch('/api/user/bookings', {
         headers: {
-          Authorization: `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          router.push('/login');
+          return;
+        }
         throw new Error('Failed to fetch bookings');
       }
 
       const data = await response.json();
-      setBookings(data.bookings || []);
+
+      if (data.success) {
+        setBookings(data.bookings || []);
+      } else {
+        throw new Error(data.message || 'Failed to fetch bookings');
+      }
     } catch (error) {
       console.error('Error fetching bookings:', error);
       setError('Failed to load your bookings. Please try again later.');
@@ -90,20 +98,18 @@ export default function UserBookingsPage() {
     }
   };
 
-  // Effect to fetch bookings on component mount
+  // Effect to check authentication and fetch bookings
   useEffect(() => {
-    // Safely access localStorage only in browser environment
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        router.push('/login?redirect=/bookings');
-        return;
-      }
+    if (!isLoading && !isAuthenticated) {
+      toast.error('Please log in to view your bookings');
+      router.push('/login');
+      return;
+    }
 
+    if (isAuthenticated && user) {
       fetchBookings();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
@@ -130,6 +136,7 @@ export default function UserBookingsPage() {
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
       case 'confirmed':
+      case 'assigned':
       case 'booked':
         return 'bg-blue-100 text-blue-800';
       case 'completed':
@@ -156,6 +163,14 @@ export default function UserBookingsPage() {
 
   const getBookingStatus = (booking: Booking) => {
     return booking.bookingStatus || booking.status || 'pending';
+  };
+
+  const getValidBookingStatus = (booking: Booking): 'pending' | 'confirmed' | 'completed' | 'cancelled' => {
+    const status = getBookingStatus(booking).toLowerCase();
+    if (['pending', 'confirmed', 'completed', 'cancelled'].includes(status)) {
+      return status as 'pending' | 'confirmed' | 'completed' | 'cancelled';
+    }
+    return 'pending'; // Default fallback
   };
 
   const getBookingDate = (booking: Booking) => {
@@ -483,7 +498,7 @@ export default function UserBookingsPage() {
                       orderId={getOrderId(selectedBooking)}
                       currentDate={getBookingDate(selectedBooking)}
                       currentTime={getBookingTime(selectedBooking)}
-                      status={getBookingStatus(selectedBooking)}
+                      status={getValidBookingStatus(selectedBooking)}
                       onRescheduleSuccess={() => {
                         toast.success('Your booking has been rescheduled');
                         setShowBookingDetails(false);

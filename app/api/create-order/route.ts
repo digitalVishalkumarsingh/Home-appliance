@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
     // Store order in database
     try {
-      const { db } = await connectToDatabase();
+      const { db } = await connectToDatabase({ timeoutMs: 10000 });
       await db.collection('orders').insertOne({
         orderId: order.id,
         amount: order.amount,

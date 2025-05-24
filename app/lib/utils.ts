@@ -1,161 +1,137 @@
-import { ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+import crypto from "crypto";
+import { logger } from "../config/logger";
 
-/**
- * Combines multiple class names and merges Tailwind CSS classes
- * @param inputs - Class names to combine
- * @returns Merged class names
- */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/**
- * Formats a date string to a localized date format
- * @param dateString - ISO date string
- * @param options - Intl.DateTimeFormatOptions
- * @returns Formatted date string
- */
-export function formatDate(
+export async function formatDate(
   dateString: string,
   options: Intl.DateTimeFormatOptions = {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   }
-) {
-  return new Date(dateString).toLocaleDateString('en-US', options);
+): Promise<string> {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      throw new Error("Invalid date");
+    }
+    return date.toLocaleDateString("en-US", options);
+  } catch (error) {
+    await logger.warn("Invalid date format", { dateString, error: error instanceof Error ? error.message : "Unknown error" });
+    return "Invalid Date";
+  }
 }
 
-/**
- * Formats a currency amount
- * @param amount - Amount to format
- * @param currency - Currency code (default: INR)
- * @returns Formatted currency string
- */
-export function formatCurrency(amount: number, currency = 'INR') {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency,
-  }).format(amount);
+export function formatCurrency(amount: number, currency = "INR"): string {
+  try {
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(amount);
+  } catch (error) {
+    logger.error("Failed to format currency", { amount, currency, error: error instanceof Error ? error.message : "Unknown error" });
+    return `${amount} ${currency}`;
+  }
 }
 
-/**
- * Truncates a string to a specified length and adds an ellipsis
- * @param str - String to truncate
- * @param length - Maximum length
- * @returns Truncated string
- */
-export function truncateString(str: string, length = 50) {
-  if (!str) return '';
+export function truncateString(str: string, length = 50): string {
+  if (!str) return "";
   return str.length > length ? `${str.substring(0, length)}...` : str;
 }
 
-/**
- * Debounces a function call
- * @param fn - Function to debounce
- * @param delay - Delay in milliseconds
- * @returns Debounced function
- */
-export function debounce<T extends (...args: any[]) => any>(
-  fn: T,
-  delay: number
-) {
+export function debounce<T extends (...args: any[]) => any>(fn: T, delay: number) {
   let timeoutId: NodeJS.Timeout;
-  return function (...args: Parameters<T>) {
+  const debounced = function (...args: Parameters<T>) {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => fn(...args), delay);
   };
+  debounced.cancel = () => clearTimeout(timeoutId);
+  return debounced;
 }
 
-/**
- * Generates a random string of specified length
- * @param length - Length of the string
- * @returns Random string
- */
-export function generateRandomString(length = 8) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+export function generateRandomString(length = 8): string {
+  try {
+    return crypto.randomBytes(Math.ceil(length / 2)).toString("hex").slice(0, length);
+  } catch (error) {
+    logger.error("Failed to generate random string", { length, error: error instanceof Error ? error.message : "Unknown error" });
+    throw new Error("Failed to generate random string");
   }
-  return result;
 }
 
-/**
- * Validates an email address
- * @param email - Email to validate
- * @returns Whether the email is valid
- */
-export function isValidEmail(email: string) {
+export function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  const isValid = emailRegex.test(email);
+  if (!isValid) {
+    logger.warn("Invalid email format", { email: "[REDACTED]" });
+  }
+  return isValid;
 }
 
-/**
- * Validates a phone number (basic validation)
- * @param phone - Phone number to validate
- * @returns Whether the phone number is valid
- */
-export function isValidPhone(phone: string) {
-  const phoneRegex = /^\d{10}$/;
-  return phoneRegex.test(phone);
+export function isValidPhone(phone: string): boolean {
+  const phoneRegex = /^\+?\d{10,15}$/;
+  const cleanedPhone = phone.replace(/[\s-]/g, "");
+  const isValid = phoneRegex.test(cleanedPhone);
+  if (!isValid) {
+    logger.warn("Invalid phone format", { phone: "[REDACTED]" });
+  }
+  return isValid;
 }
 
-/**
- * Extracts error message from various error types
- * @param error - Error object
- * @returns Error message string
- */
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
+  if (error instanceof Error) {
+    logger.error("Error extracted", { message: error.message, name: error.name });
+    return error.message;
+  }
+  const message = String(error);
+  logger.error("Non-Error object converted to string", { message });
+  return message;
 }
 
-/**
- * Safely parses JSON with error handling
- * @param jsonString - JSON string to parse
- * @param fallback - Fallback value if parsing fails
- * @returns Parsed object or fallback
- */
-export function safeJsonParse<T>(jsonString: string, fallback: T): T {
+export async function safeJsonParse<T>(jsonString: string, fallback: T): Promise<T> {
   try {
     return JSON.parse(jsonString) as T;
   } catch (error) {
+    await logger.error("Failed to parse JSON", { jsonString: truncateString(jsonString, 50), error: error instanceof Error ? error.message : "Unknown error" });
     return fallback;
   }
 }
 
-/**
- * Gets a value from localStorage with error handling
- * @param key - localStorage key
- * @param fallback - Fallback value if key doesn't exist or error occurs
- * @returns Value from localStorage or fallback
- */
-export function getFromLocalStorage<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
+export async function getFromLocalStorage<T>(key: string, fallback: T): Promise<T> {
+  if (typeof window === "undefined") {
+    await logger.warn("Attempted to access localStorage in non-browser environment", { key });
+    return fallback;
+  }
   try {
     const item = localStorage.getItem(key);
-    return item ? (JSON.parse(item) as T) : fallback;
+    if (!item) {
+      await logger.info("No value found in localStorage", { key });
+      return fallback;
+    }
+    const parsed = JSON.parse(item) as T;
+    await logger.info("Value retrieved from localStorage", { key });
+    return parsed;
   } catch (error) {
-    console.error(`Error reading ${key} from localStorage:`, error);
+    await logger.error("Error reading from localStorage", { key, error: error instanceof Error ? error.message : "Unknown error" });
     return fallback;
   }
 }
 
-/**
- * Sets a value in localStorage with error handling
- * @param key - localStorage key
- * @param value - Value to store
- * @returns Whether the operation was successful
- */
-export function setToLocalStorage(key: string, value: any): boolean {
-  if (typeof window === 'undefined') return false;
+export async function setToLocalStorage(key: string, value: any): Promise<boolean> {
+  if (typeof window === "undefined") {
+    await logger.warn("Attempted to write to localStorage in non-browser environment", { key });
+    return false;
+  }
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    await logger.info("Value written to localStorage", { key });
+    if (key.toLowerCase().includes("token") || key.toLowerCase().includes("password")) {
+      await logger.warn("Storing sensitive data in localStorage is insecure", { key });
+    }
     return true;
   } catch (error) {
-    console.error(`Error writing ${key} to localStorage:`, error);
+    await logger.error("Error writing to localStorage", { key, error: error instanceof Error ? error.message : "Unknown error" });
     return false;
   }
 }

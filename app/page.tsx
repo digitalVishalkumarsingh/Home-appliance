@@ -7,8 +7,7 @@ import { FaRegUser, FaShieldAlt, FaDollarSign, FaClock } from "react-icons/fa";
 import Link from "next/link";
 
 // Import static services as fallback
-import { services as staticServices } from "@/app/lib/services";
-
+import { services as staticServices, Service, Testimonial, Pricing } from "@/app/lib/services";
 
 interface FormData {
   name: string;
@@ -60,24 +59,11 @@ const brands: Brand[] = [
   { name: "LG", src: "/lg-logo.webp" },
 ];
 
-
 const PHONE_NUMBER: string = process.env.NEXT_PUBLIC_PHONE || "9112564731";
-
-// Define the Service interface
-interface ServiceType {
-  id: string;
-  title: string;
-  img: string;
-  desc: string;
-  pricing?: any;
-  testimonial?: any;
-  details?: string[];
-  isActive?: boolean;
-}
 
 export default function Home() {
   const [submitted, setSubmitted] = useState(false);
-  const [services, setServices] = useState<ServiceType[]>(staticServices);
+  const [services, setServices] = useState<Service[]>(staticServices);
   const [loading, setLoading] = useState(true);
 
   const {
@@ -87,11 +73,10 @@ export default function Home() {
     formState: { errors },
   } = useForm<FormData>();
 
-  // Fetch services from API
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const response = await fetch('/api/services');
+        const response = await fetch("/api/services");
         if (response.ok) {
           const data = await response.json();
           if (data.services && Array.isArray(data.services) && data.services.length > 0) {
@@ -99,10 +84,10 @@ export default function Home() {
             console.log(`Loaded ${data.services.length} services from ${data.source}`);
           }
         } else {
-          console.error('Failed to fetch services, using static services');
+          console.error("Failed to fetch services, using static services");
         }
       } catch (error) {
-        console.error('Error fetching services:', error);
+        console.error("Error fetching services:", error);
       } finally {
         setLoading(false);
       }
@@ -133,7 +118,7 @@ export default function Home() {
 
   return (
     <>
-      <div className="bg-blue-900 text-white py-12 px-6 md:px-20 mt-0">
+      <div className="bg-blue-900 text-white py-0 pt-16 md:pt-16 px-6 md:px-20 mt-0">
         <div className="max-w-5xl mx-auto flex flex-wrap justify-between items-center space-y-8 md:space-y-0">
           <motion.div
             className="w-full md:w-1/2 text-center md:text-left p-4 md:p-6"
@@ -199,10 +184,11 @@ export default function Home() {
                 aria-invalid={errors.service ? "true" : "false"}
               >
                 <option value="">- Select Services -</option>
-                <option value="AC Repair">AC Repair</option>
-                <option value="Washing Machine Repair">Washing Machine Repair</option>
-                <option value="Refrigerator Repair">Refrigerator Repair</option>
-                <option value="Water Purifier (RO) Service">Water Purifier (RO) Service</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.title}>
+                    {service.title}
+                  </option>
+                ))}
               </select>
               {errors.service && <p className="text-red-500 text-sm mt-1">{errors.service.message}</p>}
 
@@ -328,31 +314,43 @@ export default function Home() {
           </motion.p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {services.map((service) => (
-              <motion.div
-                key={service.id}
-                className="flex flex-col items-center space-y-4 bg-white p-4 rounded-lg shadow-lg border border-neutral-200 dark:border-slate-800"
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.3 }}
-              >
-                <img
-                  src={service.img}
-                  alt={`${service.title} Service`}
-                  className="w-full h-48 object-cover mb-4 rounded-lg"
-                />
-                <h3 className="font-semibold text-lg">{service.title}</h3>
-                <p className="text-gray-700 text-center">{service.desc}</p>
-               <Link href={`/servicedetails/${service.id}`} prefetch={true}>
-                  <motion.button
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    Learn More
-                  </motion.button>
-                </Link>
-              </motion.div>
-            ))}
+            {loading ? (
+              Array(4).fill(0).map((_, index) => (
+                <div key={index} className="flex flex-col items-center space-y-4 bg-white p-4 rounded-lg shadow-lg border border-neutral-200 animate-pulse">
+                  <div className="w-full h-48 bg-gray-300 rounded-lg mb-4"></div>
+                  <div className="h-6 bg-gray-300 rounded w-3/4"></div>
+                  <div className="h-4 bg-gray-300 rounded w-full"></div>
+                  <div className="h-4 bg-gray-300 rounded w-2/3"></div>
+                  <div className="h-10 bg-gray-300 rounded w-1/2 mt-4"></div>
+                </div>
+              ))
+            ) : (
+              services.map((service) => (
+                <motion.div
+                  key={service.id}
+                  className="flex flex-col items-center space-y-4 bg-white p-4 rounded-lg shadow-lg border border-neutral-200 dark:border-slate-800"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <img
+                    src={service.img}
+                    alt={`${service.title} Service`}
+                    className="w-full h-48 object-cover mb-4 rounded-lg"
+                  />
+                  <h3 className="font-semibold text-lg">{service.title}</h3>
+                  <p className="text-gray-700 text-center">{service.desc}</p>
+                  <Link href={`/servicedetails/${service.id}`} prefetch={true}>
+                    <motion.button
+                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      Learn More
+                    </motion.button>
+                  </Link>
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </div>

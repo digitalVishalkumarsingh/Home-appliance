@@ -21,7 +21,7 @@ export async function GET(
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Find the category by slug
     const category = await db.collection("serviceCategories").findOne({ slug });
@@ -62,8 +62,7 @@ export async function GET(
 
       // Filter static services by type
       const filteredServices = staticServices.filter(service =>
-        service.type === serviceType ||
-        service.category === slug ||
+        (service as any).type === serviceType ||
         (service.id && service.id.includes(serviceType))
       );
 

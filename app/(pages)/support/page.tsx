@@ -12,13 +12,13 @@ interface SupportTicket {
   _id: string;
   subject: string;
   message: string;
-  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  status: 'open' | 'resolved' | 'closed';
   createdAt: string;
   updatedAt: string;
 }
 
 export default function SupportPage() {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, syncTokenFromCookies } = useAuth();
   const router = useRouter();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [isLoadingTickets, setIsLoadingTickets] = useState(true);
@@ -35,25 +35,60 @@ export default function SupportPage() {
   const emailAddress = process.env.NEXT_PUBLIC_EMAIL_ADDRESS || 'support@dizitsolution.com';
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast.error('Please log in to access support');
-      router.push('/login');
+    console.log('Support - Auth state:', { isLoading, isAuthenticated, hasUser: !!user });
+
+    // Don't redirect while still loading
+    if (isLoading) {
+      console.log('Support - Still loading, waiting...');
       return;
     }
 
-    if (isAuthenticated && user) {
-      fetchTickets();
+    // If not authenticated, try to sync token from cookies first
+    if (!isAuthenticated || !user) {
+      console.log('Support - Not authenticated, trying to sync token from cookies');
+      const hasToken = syncTokenFromCookies();
+
+      if (!hasToken) {
+        console.log('Support - No token found, redirecting to login');
+        toast.error('Please log in to access support');
+        router.push('/login');
+        return;
+      } else {
+        console.log('Support - Token found, waiting for authentication to complete');
+        // Token was found, wait for the auth hook to process it
+        return;
+      }
     }
-  }, [isAuthenticated, isLoading, user, router]);
+
+    // User is authenticated, fetch tickets
+    console.log('Support - User authenticated, fetching tickets');
+    fetchTickets();
+  }, [isAuthenticated, isLoading, user, router, syncTokenFromCookies]);
 
   const fetchTickets = async () => {
     try {
       setIsLoadingTickets(true);
       setError(null);
 
-      const response = await fetch('/api/user/support/tickets');
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('/api/user/support/tickets', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          router.push('/login');
+          return;
+        }
         throw new Error('Failed to fetch support tickets');
       }
 
@@ -83,9 +118,16 @@ export default function SupportPage() {
     try {
       setIsSubmitting(true);
 
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await fetch('/api/user/support/tickets', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ subject, message }),

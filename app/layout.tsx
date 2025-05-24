@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import LayoutWrapper from "./components/LayoutWrapper";
+
 import { Toaster } from 'react-hot-toast';
 import OfferNotificationsClient from "./components/OfferNotificationsClient";
 import NewUserWelcome from "./components/NewUserWelcome";
 import FirstTimeBookingNotification from "./components/FirstTimeBookingNotification";
+import MainLayout from "./components/MainLayout";
 
 
 const geistSans = Geist({
@@ -34,9 +35,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Toaster position="top-center" />
-        <LayoutWrapper>
+        <MainLayout>
           {children}
-        </LayoutWrapper>
+        </MainLayout>
         <OfferNotificationsClient />
         <NewUserWelcome />
         <FirstTimeBookingNotification />

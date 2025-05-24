@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -13,6 +13,8 @@ import {
   FaPrint,
 } from "react-icons/fa";
 import AdminBookingModal from "@/app/components/admin/AdminBookingModal";
+import Pagination from "@/app/components/admin/Pagination";
+import { toast } from "react-hot-toast";
 
 interface Booking {
   id: string;
@@ -23,7 +25,7 @@ interface Booking {
   time: string;
   address: string;
   status: "pending" | "confirmed" | "completed" | "cancelled";
-  paymentStatus: "pending" | "paid";
+  paymentStatus: "pending" | "paid" | "failed";
   amount: number;
   technician?: string;
 }
@@ -33,206 +35,49 @@ export default function BookingsPage() {
   const statusFilter = searchParams.get("status") || "all";
 
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [selectedStatus, setSelectedStatus] = useState(statusFilter);
-  const [selectedDateRange, setSelectedDateRange] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState<
+    "all" | "pending" | "confirmed" | "completed" | "cancelled"
+  >(statusFilter as "all" | "pending" | "confirmed" | "completed" | "cancelled");
+  const [selectedDateRange, setSelectedDateRange] = useState<"all" | "today" | "week" | "month">("all");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [processingBookingId, setProcessingBookingId] = useState<string | null>(null);
 
+  // Fetch bookings
   useEffect(() => {
-    // Check if we're running on the client side
-    if (typeof window === 'undefined') {
-      return; // Exit early if we're on the server side
-    }
-
     const fetchBookings = async () => {
       try {
-        // Get token from localStorage (only available on client side)
+        setLoading(true);
         const token = localStorage.getItem("token");
 
         if (!token) {
-          console.error("No token found in localStorage");
-          throw new Error("Authentication token not found");
+          throw new Error("Authentication token not found. Please log in again.");
         }
 
-        // Fetch bookings from the API
-        const response = await fetch("/api/admin/bookings", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/bookings`, {
           headers: {
-            "Authorization": `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         if (!response.ok) {
-          throw new Error("Failed to fetch bookings");
+          throw new Error(`Failed to fetch bookings: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
 
         if (data.success && Array.isArray(data.bookings)) {
-          console.log("Bookings fetched successfully:", data.bookings);
           setBookings(data.bookings);
         } else {
-          console.error("Invalid response format:", data);
-          throw new Error("Invalid response format");
+          throw new Error("Invalid response format from server");
         }
       } catch (error) {
         console.error("Error fetching bookings:", error);
-        // If API fails, use mock data for demonstration
-        setBookings([
-          {
-            id: "BK001",
-            customerName: "Rahul Sharma",
-            customerPhone: "9876543210",
-            service: "AC Repair",
-            date: "2023-07-15",
-            time: "10:00 AM",
-            address: "123 Main St, Varanasi",
-            status: "completed",
-            paymentStatus: "paid",
-            amount: 1200,
-            technician: "Amit Kumar",
-          },
-          {
-            id: "BK002",
-            customerName: "Priya Patel",
-            customerPhone: "8765432109",
-            service: "Washing Machine Repair",
-            date: "2023-07-16",
-            time: "02:30 PM",
-            address: "456 Park Ave, Varanasi",
-            status: "confirmed",
-            paymentStatus: "pending",
-            amount: 800,
-            technician: "Rajesh Singh",
-          },
-          {
-            id: "BK003",
-            customerName: "Amit Singh",
-            customerPhone: "7654321098",
-            service: "Refrigerator Repair",
-            date: "2023-07-17",
-            time: "11:15 AM",
-            address: "789 Lake View, Varanasi",
-            status: "pending",
-            paymentStatus: "pending",
-            amount: 1500,
-          },
-          {
-            id: "BK004",
-            customerName: "Neha Gupta",
-            customerPhone: "6543210987",
-            service: "Microwave Repair",
-            date: "2023-07-18",
-            time: "04:00 PM",
-            address: "234 River Road, Varanasi",
-            status: "cancelled",
-            paymentStatus: "pending",
-            amount: 600,
-          },
-          {
-            id: "BK005",
-            customerName: "Vikram Joshi",
-            customerPhone: "5432109876",
-            service: "Geyser Repair",
-            date: "2023-07-19",
-            time: "09:30 AM",
-            address: "567 Temple St, Varanasi",
-            status: "pending",
-            paymentStatus: "pending",
-            amount: 700,
-          },
-          {
-            id: "BK006",
-            customerName: "Sneha Verma",
-            customerPhone: "4321098765",
-            service: "AC Repair",
-            date: "2023-07-20",
-            time: "01:00 PM",
-            address: "890 Gandhi Road, Varanasi",
-            status: "confirmed",
-            paymentStatus: "paid",
-            amount: 1100,
-            technician: "Amit Kumar",
-          },
-          {
-            id: "BK007",
-            customerName: "Rajat Kapoor",
-            customerPhone: "3210987654",
-            service: "Chimney Repair",
-            date: "2023-07-21",
-            time: "03:45 PM",
-            address: "123 Shivpur, Varanasi",
-            status: "pending",
-            paymentStatus: "pending",
-            amount: 900,
-          },
-          {
-            id: "BK008",
-            customerName: "Ananya Mishra",
-            customerPhone: "2109876543",
-            service: "RO Water Purifier Repair",
-            date: "2023-07-22",
-            time: "10:30 AM",
-            address: "456 Lanka, Varanasi",
-            status: "completed",
-            paymentStatus: "paid",
-            amount: 750,
-            technician: "Rajesh Singh",
-          },
-          {
-            id: "BK009",
-            customerName: "Karan Malhotra",
-            customerPhone: "1098765432",
-            service: "Deep Freezer Repair",
-            date: "2023-07-23",
-            time: "12:15 PM",
-            address: "789 Sigra, Varanasi",
-            status: "confirmed",
-            paymentStatus: "pending",
-            amount: 1300,
-            technician: "Suresh Yadav",
-          },
-          {
-            id: "BK010",
-            customerName: "Pooja Sharma",
-            customerPhone: "9087654321",
-            service: "Washing Machine Repair",
-            date: "2023-07-24",
-            time: "05:00 PM",
-            address: "234 Cantt, Varanasi",
-            status: "pending",
-            paymentStatus: "pending",
-            amount: 850,
-          },
-          {
-            id: "BK011",
-            customerName: "Deepak Agarwal",
-            customerPhone: "8976543210",
-            service: "AC Repair",
-            date: "2023-07-25",
-            time: "11:00 AM",
-            address: "567 Sarnath, Varanasi",
-            status: "pending",
-            paymentStatus: "pending",
-            amount: 1250,
-          },
-          {
-            id: "BK012",
-            customerName: "Meera Jain",
-            customerPhone: "7865432109",
-            service: "Refrigerator Repair",
-            date: "2023-07-26",
-            time: "02:00 PM",
-            address: "890 Assi, Varanasi",
-            status: "confirmed",
-            paymentStatus: "paid",
-            amount: 1400,
-            technician: "Amit Kumar",
-          },
-        ]);
+        toast.error(error instanceof Error ? error.message : "Failed to load bookings");
+        setBookings([]);
       } finally {
         setLoading(false);
       }
@@ -241,8 +86,8 @@ export default function BookingsPage() {
     fetchBookings();
   }, []);
 
-  useEffect(() => {
-    // Apply filters
+  // Memoized filtered bookings
+  const filteredBookings = useMemo(() => {
     let filtered = [...bookings];
 
     // Filter by status
@@ -256,7 +101,7 @@ export default function BookingsPage() {
       const startDate = new Date();
 
       if (selectedDateRange === "today") {
-        // No adjustment needed for today
+        startDate.setHours(0, 0, 0, 0);
       } else if (selectedDateRange === "week") {
         startDate.setDate(today.getDate() - 7);
       } else if (selectedDateRange === "month") {
@@ -281,11 +126,10 @@ export default function BookingsPage() {
       );
     }
 
-    setFilteredBookings(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
+    return filtered;
   }, [bookings, selectedStatus, selectedDateRange, searchTerm]);
 
-  // Get current bookings for pagination
+  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentBookings = filteredBookings.slice(indexOfFirstItem, indexOfLastItem);
@@ -312,55 +156,49 @@ export default function BookingsPage() {
         return "bg-green-100 text-green-800";
       case "pending":
         return "bg-yellow-100 text-yellow-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
   };
 
+  const handleStatusChange = async (id: string, newStatus: "confirmed" | "cancelled") => {
+    if (processingBookingId) return; // Prevent multiple simultaneous requests
 
-
-  const handleStatusChange = async (id: string, newStatus: string) => {
     try {
-      // Get token from localStorage
+      setProcessingBookingId(id);
       const token = localStorage.getItem("token");
 
       if (!token) {
-        console.error("No token found in localStorage");
-        throw new Error("Authentication token not found");
+        throw new Error("Authentication token not found. Please log in again.");
       }
 
-      // Call the API to update booking status
-      const response = await fetch(`/api/admin/bookings/${id}/status`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/bookings/${id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ status: newStatus }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update booking status");
+        throw new Error(errorData.message || `Failed to update booking status to ${newStatus}`);
       }
 
-      const data = await response.json();
-      console.log("Status updated successfully:", data);
-
-      // Show success message
-      alert(`Booking status updated to ${newStatus}`);
-
-      // Update the booking status in the state
-      setBookings(
-        bookings.map((booking) =>
-          booking.id === id
-            ? { ...booking, status: newStatus as any }
-            : booking
+      toast.success(`Booking status updated to ${newStatus}`);
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === id ? { ...booking, status: newStatus } : booking
         )
       );
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating booking status:", error);
-      alert(error.message || "Failed to update booking status. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to update booking status");
+    } finally {
+      setProcessingBookingId(null);
     }
   };
 
@@ -377,9 +215,7 @@ export default function BookingsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Bookings</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage all service bookings
-          </p>
+          <p className="mt-1 text-sm text-gray-500">Manage all service bookings</p>
         </div>
       </div>
 
@@ -395,7 +231,9 @@ export default function BookingsPage() {
               <select
                 id="status"
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                onChange={(e) =>
+                  setSelectedStatus(e.target.value as typeof selectedStatus)
+                }
                 className="block w-full sm:w-auto pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
               >
                 <option value="all">All</option>
@@ -413,7 +251,9 @@ export default function BookingsPage() {
               <select
                 id="dateRange"
                 value={selectedDateRange}
-                onChange={(e) => setSelectedDateRange(e.target.value)}
+                onChange={(e) =>
+                  setSelectedDateRange(e.target.value as typeof selectedDateRange)
+                }
                 className="block w-full sm:w-auto pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
               >
                 <option value="all">All Time</option>
@@ -496,16 +336,10 @@ export default function BookingsPage() {
                       {booking.id}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {booking.customerName}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {booking.customerPhone}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{booking.customerName}</div>
+                      <div className="text-sm text-gray-500">{booking.customerPhone}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {booking.service}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{booking.service}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
                         {new Date(booking.date).toLocaleDateString()}
@@ -518,8 +352,7 @@ export default function BookingsPage() {
                           booking.status
                         )}`}
                       >
-                        {booking.status.charAt(0).toUpperCase() +
-                          booking.status.slice(1)}
+                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -528,16 +361,16 @@ export default function BookingsPage() {
                           booking.paymentStatus
                         )}`}
                       >
-                        {booking.paymentStatus.charAt(0).toUpperCase() +
-                          booking.paymentStatus.slice(1)}
+                        {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
                       </span>
                       <div className="text-sm text-gray-500">
-                        ₹{booking.amount}
+                        ₹{new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(
+                          booking.amount
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
-                        {/* View Button */}
                         <Link href={`/admin/bookings/${booking.id}`}>
                           <div
                             className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-100 cursor-pointer"
@@ -546,30 +379,34 @@ export default function BookingsPage() {
                             <FaEye />
                           </div>
                         </Link>
-
-                        {/* Accept Button - Show for pending bookings */}
                         {booking.status === "pending" && (
                           <button
                             onClick={() => handleStatusChange(booking.id, "confirmed")}
-                            className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-100"
+                            disabled={processingBookingId === booking.id}
+                            className="text-green-600 hover:text-green-900 disabled:opacity-50 p-1 rounded hover:bg-green-100"
                             title="Accept Booking"
                           >
-                            <FaCheck />
+                            {processingBookingId === booking.id ? (
+                              <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full"></div>
+                            ) : (
+                              <FaCheck />
+                            )}
                           </button>
                         )}
-
-                        {/* Cancel Button - Show for pending and confirmed bookings */}
                         {(booking.status === "pending" || booking.status === "confirmed") && (
                           <button
                             onClick={() => handleStatusChange(booking.id, "cancelled")}
-                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-100"
+                            disabled={processingBookingId === booking.id}
+                            className="text-red-600 hover:text-red-900 disabled:opacity-50 p-1 rounded hover:bg-red-100"
                             title="Cancel Booking"
                           >
-                            <FaTimes />
+                            {processingBookingId === booking.id ? (
+                              <div className="animate-spin h-4 w-4 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                            ) : (
+                              <FaTimes />
+                            )}
                           </button>
                         )}
-
-                        {/* Print Button */}
                         <button
                           onClick={() => setSelectedBookingId(booking.id)}
                           className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-100"
@@ -583,10 +420,7 @@ export default function BookingsPage() {
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="px-6 py-4 text-center text-sm text-gray-500"
-                  >
+                  <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
                     No bookings found
                   </td>
                 </tr>
@@ -601,51 +435,18 @@ export default function BookingsPage() {
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
-                  Showing{" "}
-                  <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
-                  <span className="font-medium">
-                    {Math.min(indexOfLastItem, filteredBookings.length)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-medium">{filteredBookings.length}</span>{" "}
-                  results
+                  Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+                  <span className="font-medium">{Math.min(indexOfLastItem, filteredBookings.length)}</span> of{" "}
+                  <span className="font-medium">{filteredBookings.length}</span> results
                 </p>
               </div>
               <div>
-                <nav
-                  className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                  aria-label="Pagination"
-                >
-                  <button
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium ${
-                          currentPage === page
-                            ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
-                            : "text-gray-500 hover:bg-gray-50"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    )
-                  )}
-                  <button
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </nav>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  maxPageButtons={5}
+                />
               </div>
             </div>
           </div>
@@ -653,21 +454,39 @@ export default function BookingsPage() {
       </div>
 
       {/* Booking Details Modal */}
-      <AdminBookingModal
-        bookingId={selectedBookingId || ''}
-        isOpen={!!selectedBookingId}
-        onClose={() => {
-          setSelectedBookingId(null);
-          // No need to refresh, the state is already updated
-        }}
-        onStatusChange={(status) => {
-          // Handle status change
-          if (selectedBookingId) {
-            handleStatusChange(selectedBookingId, status as any);
-          }
-          // No need to refresh, the state is already updated in handleStatusChange
-        }}
-      />
+      {selectedBookingId && (
+        <AdminBookingModal
+          bookingId={selectedBookingId}
+          isOpen={!!selectedBookingId}
+          onClose={() => {
+            setSelectedBookingId(null);
+            // Refresh bookings to ensure consistency
+            setLoading(true);
+            const token = localStorage.getItem("token");
+            if (token) {
+              fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/bookings`, {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+                .then((response) => response.json())
+                .then((data) => {
+                  if (data.success && Array.isArray(data.bookings)) {
+                    setBookings(data.bookings);
+                  }
+                })
+                .catch((error) => {
+                  console.error("Error refreshing bookings:", error);
+                  toast.error("Failed to refresh bookings");
+                })
+                .finally(() => setLoading(false));
+            }
+          }}
+          onStatusChange={(status) => {
+            if (selectedBookingId) {
+              handleStatusChange(selectedBookingId, status as "confirmed" | "cancelled");
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

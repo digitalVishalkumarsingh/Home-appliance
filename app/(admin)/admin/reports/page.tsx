@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FaSpinner, FaDownload, FaCalendarAlt, FaChartBar, FaRupeeSign } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
@@ -18,15 +18,9 @@ interface ReportData {
     completed: number;
     cancelled: number;
   };
-  revenueByService: {
-    [key: string]: number;
-  };
-  bookingsByMonth: {
-    [key: string]: number;
-  };
-  revenueByMonth: {
-    [key: string]: number;
-  };
+  revenueByService: { [key: string]: number };
+  bookingsByMonth: { [key: string]: number };
+  revenueByMonth: { [key: string]: number };
 }
 
 export default function ReportsPage() {
@@ -37,29 +31,19 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  useEffect(() => {
-    // Set default date range
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    setStartDate(firstDayOfMonth.toISOString().split('T')[0]);
-    setEndDate(today.toISOString().split('T')[0]);
-    
-    fetchReportData();
-  }, []);
-
-  const fetchReportData = async () => {
+  const fetchReportData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       const token = localStorage.getItem("token");
       if (!token) {
-        setError("Authentication token not found");
-        return;
+        throw new Error("Authentication token not found");
       }
 
-      let url = "/api/admin/reports";
+      // Use environment variable for API base URL
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "/api";
+      let url = `${baseUrl}/admin/reports`;
       if (dateRange !== "all") {
         url += `?startDate=${startDate}&endDate=${endDate}`;
       }
@@ -68,6 +52,7 @@ export default function ReportsPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        cache: "no-store", // Ensure fresh data for serverless
       });
 
       if (!response.ok) {
@@ -76,7 +61,6 @@ export default function ReportsPage() {
       }
 
       const data = await response.json();
-      
       if (data.success && data.reportData) {
         setReportData(data.reportData);
       } else {
@@ -89,17 +73,28 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [startDate, endDate, dateRange]);
+
+  useEffect(() => {
+    // Set default date range
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    setStartDate(firstDayOfMonth.toISOString().split('T')[0]);
+    setEndDate(today.toISOString().split('T')[0]);
+  }, []);
+
+  useEffect(() => {
+    fetchReportData();
+  }, [fetchReportData]);
 
   const handleDateRangeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const range = e.target.value;
     setDateRange(range);
-    
+
     const today = new Date();
     let start = new Date();
-    
+
     if (range === "week") {
-      start = new Date(today);
       start.setDate(today.getDate() - 7);
     } else if (range === "month") {
       start = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -108,12 +103,11 @@ export default function ReportsPage() {
     } else if (range === "year") {
       start = new Date(today.getFullYear(), 0, 1);
     } else if (range === "all") {
-      // Don't set dates for "all"
       setStartDate("");
       setEndDate("");
       return;
     }
-    
+
     setStartDate(start.toISOString().split('T')[0]);
     setEndDate(today.toISOString().split('T')[0]);
   };
@@ -125,133 +119,104 @@ export default function ReportsPage() {
 
   const handleExportCSV = () => {
     if (!reportData) return;
-    
-    // Create CSV content
-    let csvContent = "data:text/csv;charset=utf-8,";
-    
-    // Add header
-    csvContent += "Report Generated on," + new Date().toLocaleString() + "\n\n";
-    
-    // Add summary
-    csvContent += "Summary\n";
-    csvContent += "Total Bookings," + reportData.totalBookings + "\n";
-    csvContent += "Total Revenue,₹" + reportData.totalRevenue.toFixed(2) + "\n";
-    csvContent += "Total Customers," + reportData.totalCustomers + "\n\n";
-    
-    // Add bookings by status
-    csvContent += "Bookings by Status\n";
-    csvContent += "Pending," + reportData.bookingsByStatus.pending + "\n";
-    csvContent += "Confirmed," + reportData.bookingsByStatus.confirmed + "\n";
-    csvContent += "Completed," + reportData.bookingsByStatus.completed + "\n";
-    csvContent += "Cancelled," + reportData.bookingsByStatus.cancelled + "\n\n";
-    
-    // Add revenue by service
-    csvContent += "Revenue by Service\n";
-    Object.entries(reportData.revenueByService).forEach(([service, revenue]) => {
-      csvContent += service + ",₹" + revenue.toFixed(2) + "\n";
-    });
-    csvContent += "\n";
-    
-    // Add bookings by month
-    csvContent += "Bookings by Month\n";
-    Object.entries(reportData.bookingsByMonth).forEach(([month, count]) => {
-      csvContent += month + "," + count + "\n";
-    });
-    csvContent += "\n";
-    
-    // Add revenue by month
-    csvContent += "Revenue by Month\n";
-    Object.entries(reportData.revenueByMonth).forEach(([month, revenue]) => {
-      csvContent += month + ",₹" + revenue.toFixed(2) + "\n";
-    });
-    
-    // Create download link
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `report_${startDate}_to_${endDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    try {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += `Report Generated on,${new Date().toLocaleString()}\n\n`;
+      csvContent += `Summary\n`;
+      csvContent += `Total Bookings,${reportData.totalBookings}\n`;
+      csvContent += `Total Revenue,₹${reportData.totalRevenue.toFixed(2)}\n`;
+      csvContent += `Total Customers,${reportData.totalCustomers}\n\n`;
+      csvContent += `Bookings by Status\n`;
+      csvContent += `Pending,${reportData.bookingsByStatus.pending}\n`;
+      csvContent += `Confirmed,${reportData.bookingsByStatus.confirmed}\n`;
+      csvContent += `Completed,${reportData.bookingsByStatus.completed}\n`;
+      csvContent += `Cancelled,${reportData.bookingsByStatus.cancelled}\n\n`;
+      csvContent += `Revenue by Service\n`;
+      Object.entries(reportData.revenueByService).forEach(([service, revenue]) => {
+        csvContent += `${service},₹${revenue.toFixed(2)}\n`;
+      });
+      csvContent += `\n`;
+      csvContent += `Bookings by Month\n`;
+      Object.entries(reportData.bookingsByMonth).forEach(([month, count]) => {
+        csvContent += `${month},${count}\n`;
+      });
+      csvContent += `\n`;
+      csvContent += `Revenue by Month\n`;
+      Object.entries(reportData.revenueByMonth).forEach(([month, revenue]) => {
+        csvContent += `${month},₹${revenue.toFixed(2)}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `report_${startDate || 'all'}_to_${endDate || 'all'}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      toast.error("Failed to export CSV");
+    }
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "top" as const,
+      },
+    },
   };
 
   const statusChartData = reportData ? {
     labels: ['Pending', 'Confirmed', 'Completed', 'Cancelled'],
-    datasets: [
-      {
-        label: 'Bookings by Status',
-        data: [
-          reportData.bookingsByStatus.pending,
-          reportData.bookingsByStatus.confirmed,
-          reportData.bookingsByStatus.completed,
-          reportData.bookingsByStatus.cancelled,
-        ],
-        backgroundColor: [
-          'rgba(255, 206, 86, 0.6)',
-          'rgba(54, 162, 235, 0.6)',
-          'rgba(75, 192, 192, 0.6)',
-          'rgba(255, 99, 132, 0.6)',
-        ],
-        borderColor: [
-          'rgba(255, 206, 86, 1)',
-          'rgba(54, 162, 235, 1)',
-          'rgba(75, 192, 192, 1)',
-          'rgba(255, 99, 132, 1)',
-        ],
-        borderWidth: 1,
-      },
-    ],
+    datasets: [{
+      label: 'Bookings by Status',
+      data: [
+        reportData.bookingsByStatus.pending,
+        reportData.bookingsByStatus.confirmed,
+        reportData.bookingsByStatus.completed,
+        reportData.bookingsByStatus.cancelled,
+      ],
+      backgroundColor: ['#FFCE56', '#36A2EB', '#4BC0C0', '#FF6384'],
+      borderColor: ['#FFD700', '#1E90FF', '#20B2AA', '#FF4500'],
+      borderWidth: 1,
+    }],
   } : { labels: [], datasets: [] };
 
   const serviceRevenueChartData = reportData ? {
     labels: Object.keys(reportData.revenueByService),
-    datasets: [
-      {
-        label: 'Revenue by Service',
-        data: Object.values(reportData.revenueByService),
-        backgroundColor: [
-          'rgba(255, 99, 132, 0.6)',
-          'rgba(54, 162, 235, 0.6)',
-          'rgba(255, 206, 86, 0.6)',
-          'rgba(75, 192, 192, 0.6)',
-          'rgba(153, 102, 255, 0.6)',
-        ],
-        borderColor: [
-          'rgba(255, 99, 132, 1)',
-          'rgba(54, 162, 235, 1)',
-          'rgba(255, 206, 86, 1)',
-          'rgba(75, 192, 192, 1)',
-          'rgba(153, 102, 255, 1)',
-        ],
-        borderWidth: 1,
-      },
-    ],
+    datasets: [{
+      label: 'Revenue by Service',
+      data: Object.values(reportData.revenueByService),
+      backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'],
+      borderColor: ['#FF4500', '#1E90FF', '#FFD700', '#20B2AA', '#8A2BE2'],
+      borderWidth: 1,
+    }],
   } : { labels: [], datasets: [] };
 
   const monthlyBookingsChartData = reportData ? {
     labels: Object.keys(reportData.bookingsByMonth),
-    datasets: [
-      {
-        label: 'Bookings by Month',
-        data: Object.values(reportData.bookingsByMonth),
-        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-        borderColor: 'rgba(54, 162, 235, 1)',
-        borderWidth: 1,
-      },
-    ],
+    datasets: [{
+      label: 'Bookings by Month',
+      data: Object.values(reportData.bookingsByMonth),
+      backgroundColor: '#36A2EB',
+      borderColor: '#1E90FF',
+      borderWidth: 1,
+    }],
   } : { labels: [], datasets: [] };
 
   const monthlyRevenueChartData = reportData ? {
     labels: Object.keys(reportData.revenueByMonth),
-    datasets: [
-      {
-        label: 'Revenue by Month',
-        data: Object.values(reportData.revenueByMonth),
-        backgroundColor: 'rgba(75, 192, 192, 0.6)',
-        borderColor: 'rgba(75, 192, 192, 1)',
-        borderWidth: 1,
-      },
-    ],
+    datasets: [{
+      label: 'Revenue by Month',
+      data: Object.values(reportData.revenueByMonth),
+      backgroundColor: '#4BC0C0',
+      borderColor: '#20B2AA',
+      borderWidth: 1,
+    }],
   } : { labels: [], datasets: [] };
 
   if (loading) {
@@ -287,15 +252,13 @@ export default function ReportsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Reports</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            View and analyze business performance
-          </p>
+          <p className="mt-1 text-sm text-gray-500">View and analyze business performance</p>
         </div>
         <div className="mt-4 sm:mt-0">
           <button
             onClick={handleExportCSV}
             disabled={!reportData}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FaDownload className="mr-2 -ml-1 h-5 w-5" />
             Export CSV
@@ -307,9 +270,7 @@ export default function ReportsPage() {
         <div className="px-4 py-5 sm:p-6">
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row sm:items-end space-y-4 sm:space-y-0 sm:space-x-4">
             <div>
-              <label htmlFor="dateRange" className="block text-sm font-medium text-gray-700">
-                Date Range
-              </label>
+              <label htmlFor="dateRange" className="block text-sm font-medium text-gray-700">Date Range</label>
               <select
                 id="dateRange"
                 value={dateRange}
@@ -327,9 +288,7 @@ export default function ReportsPage() {
             {dateRange === "custom" && (
               <>
                 <div>
-                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
-                    Start Date
-                  </label>
+                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">Start Date</label>
                   <input
                     type="date"
                     id="startDate"
@@ -339,9 +298,7 @@ export default function ReportsPage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
-                    End Date
-                  </label>
+                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">End Date</label>
                   <input
                     type="date"
                     id="endDate"
@@ -367,7 +324,6 @@ export default function ReportsPage() {
 
       {reportData && (
         <>
-          {/* Summary Cards */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
@@ -378,9 +334,7 @@ export default function ReportsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Total Bookings</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">{reportData.totalBookings}</div>
-                      </dd>
+                      <dd className="text-2xl font-semibold text-gray-900">{reportData.totalBookings.toLocaleString()}</dd>
                     </dl>
                   </div>
                 </div>
@@ -396,9 +350,7 @@ export default function ReportsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Total Revenue</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">₹{reportData.totalRevenue.toLocaleString()}</div>
-                      </dd>
+                      <dd className="text-2xl font-semibold text-gray-900">₹{reportData.totalRevenue.toLocaleString()}</dd>
                     </dl>
                   </div>
                 </div>
@@ -416,9 +368,7 @@ export default function ReportsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Total Customers</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">{reportData.totalCustomers}</div>
-                      </dd>
+                      <dd className="text-2xl font-semibold text-gray-900">{reportData.totalCustomers.toLocaleString()}</dd>
                     </dl>
                   </div>
                 </div>
@@ -436,9 +386,7 @@ export default function ReportsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Completed Bookings</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">{reportData.bookingsByStatus.completed}</div>
-                      </dd>
+                      <dd className="text-2xl font-semibold text-gray-900">{reportData.bookingsByStatus.completed.toLocaleString()}</dd>
                     </dl>
                   </div>
                 </div>
@@ -446,13 +394,12 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {/* Charts */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Bookings by Status</h3>
                 <div className="mt-5 h-64">
-                  <Pie data={statusChartData} options={{ maintainAspectRatio: false }} />
+                  <Pie data={statusChartData} options={chartOptions} />
                 </div>
               </div>
             </div>
@@ -461,7 +408,7 @@ export default function ReportsPage() {
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Revenue by Service</h3>
                 <div className="mt-5 h-64">
-                  <Pie data={serviceRevenueChartData} options={{ maintainAspectRatio: false }} />
+                  <Pie data={serviceRevenueChartData} options={chartOptions} />
                 </div>
               </div>
             </div>
@@ -470,17 +417,7 @@ export default function ReportsPage() {
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Bookings by Month</h3>
                 <div className="mt-5 h-64">
-                  <Bar 
-                    data={monthlyBookingsChartData} 
-                    options={{ 
-                      maintainAspectRatio: false,
-                      scales: {
-                        y: {
-                          beginAtZero: true
-                        }
-                      }
-                    }} 
-                  />
+                  <Bar data={monthlyBookingsChartData} options={{ ...chartOptions, scales: { y: { beginAtZero: true } } }} />
                 </div>
               </div>
             </div>
@@ -489,17 +426,7 @@ export default function ReportsPage() {
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Revenue by Month</h3>
                 <div className="mt-5 h-64">
-                  <Bar 
-                    data={monthlyRevenueChartData} 
-                    options={{ 
-                      maintainAspectRatio: false,
-                      scales: {
-                        y: {
-                          beginAtZero: true
-                        }
-                      }
-                    }} 
-                  />
+                  <Bar data={monthlyRevenueChartData} options={{ ...chartOptions, scales: { y: { beginAtZero: true } } }} />
                 </div>
               </div>
             </div>
