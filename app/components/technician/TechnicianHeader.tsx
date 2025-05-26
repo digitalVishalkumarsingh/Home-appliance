@@ -7,7 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { FaUser, FaBars, FaTimes, FaSignOutAlt } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import  useAuth  from "../../hooks/useAuth";
-import AvailabilityToggle from "./AvailabilityToggle";
+import SimpleAvailabilityToggle from "./SimpleAvailabilityToggle";
 import NotificationBadge from "./NotificationBadge";
 import { logger } from "../../config/logger";
 
@@ -115,7 +115,13 @@ export default function TechnicianHeader() {
 
           {/* Desktop navigation */}
           <nav className="hidden md:flex space-x-6 items-center">
-            <AvailabilityToggle />
+            {/* Duty Toggle */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-medium text-white">Duty:</span>
+                <SimpleAvailabilityToggle variant="header" />
+              </div>
+            </div>
             <NotificationBadge />
           </nav>
 
@@ -182,9 +188,19 @@ export default function TechnicianHeader() {
       {isMobileMenuOpen && (
         <div className="md:hidden bg-indigo-800">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            <div className="px-3 py-2 flex space-x-4">
-              <AvailabilityToggle />
-              <NotificationBadge />
+            <div className="px-3 py-2 space-y-3">
+              {/* Mobile Duty Toggle */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 border border-white/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-white">Duty Status:</span>
+                  <SimpleAvailabilityToggle variant="header" />
+                </div>
+              </div>
+
+              {/* Mobile Notifications */}
+              <div className="flex justify-center">
+                <NotificationBadge />
+              </div>
             </div>
             <div className="border-t border-indigo-700 pt-2">
               <Link

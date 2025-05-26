@@ -26,33 +26,60 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   useEffect(() => {
     const checkAdminAuth = async () => {
       try {
+        // Check localStorage first for faster initial load
         const token = localStorage.getItem("token");
-        if (!token) {
+        const userStr = localStorage.getItem("user");
+
+        if (!token || !userStr) {
           router.push("/admin/login");
           return;
         }
 
+        // Parse user data from localStorage for immediate display
+        try {
+          const userData = JSON.parse(userStr);
+          if (userData.role === "admin") {
+            setUser(userData);
+            setIsLoading(false); // Set loading false immediately for faster UI
+          }
+        } catch (parseError) {
+          console.error("Error parsing user data:", parseError);
+          router.push("/admin/login");
+          return;
+        }
+
+        // Verify with server in background (don't block UI)
         const response = await fetch("/api/auth/me", {
           method: 'GET',
           credentials: 'include', // Include cookies in the request
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.user?.role === "admin") {
-            setUser(data.user);
-          } else {
-            toast.error("Access denied. Admin credentials required.");
-            router.push("/admin/login");
-          }
-        } else {
+        if (!response.ok) {
+          // If server verification fails, redirect to login
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
           router.push("/admin/login");
+          return;
+        }
+
+        const data = await response.json();
+        if (!data.success || data.user?.role !== "admin") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          router.push("/admin/login");
+          return;
+        }
+
+        // Update user data if different from localStorage
+        if (JSON.stringify(data.user) !== userStr) {
+          setUser(data.user);
+          localStorage.setItem("user", JSON.stringify(data.user));
         }
       } catch (error) {
         console.error("Error checking admin auth:", error);
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         router.push("/admin/login");
-      } finally {
-        setIsLoading(false);
       }
     };
 

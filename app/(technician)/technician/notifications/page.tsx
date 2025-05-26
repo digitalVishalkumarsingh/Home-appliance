@@ -96,11 +96,9 @@ export default function TechnicianNotifications() {
         throw new Error("Authentication token not found");
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-      const response = await fetchWithTimeout(`${API_URL}/api/technicians/notifications`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await fetchWithTimeout(`/api/technicians/notifications`, {
+        method: 'GET',
+        credentials: 'include', // Include cookies in the request
       });
 
       if (!response.ok) {
@@ -180,11 +178,10 @@ export default function TechnicianNotifications() {
         throw new Error("Authentication required. Please log in again.");
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-      const response = await fetchWithTimeout(`${API_URL}/api/technicians/notifications/${notificationId}/read`, {
+      const response = await fetchWithTimeout(`/api/technicians/notifications/${notificationId}/read`, {
         method: "PATCH",
+        credentials: 'include', // Include cookies in the request
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });

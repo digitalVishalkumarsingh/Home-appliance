@@ -52,11 +52,44 @@ export async function POST(request: Request) {
       );
     }
 
-    // Find job offer
-    const jobOffer = await db.collection("jobOffers").findOne({
+    // Find job offer or job notification
+    let jobOffer = await db.collection("jobOffers").findOne({
       _id: ObjectId.isValid(jobId) ? new ObjectId(jobId) : jobId,
       status: "pending"
     });
+
+    // If not found in jobOffers, check job_notifications
+    let jobNotification = null;
+    if (!jobOffer) {
+      if (ObjectId.isValid(jobId)) {
+        jobNotification = await db.collection("job_notifications").findOne({
+          _id: new ObjectId(jobId),
+          status: "pending"
+        });
+      } else {
+        jobNotification = await db.collection("job_notifications").findOne({
+          _id: jobId,
+          status: "pending"
+        });
+      }
+
+      if (jobNotification) {
+        // Convert job notification to job offer format for compatibility
+        jobOffer = {
+          _id: jobNotification._id,
+          bookingId: jobNotification.bookingId,
+          technicianId: technician._id.toString(),
+          status: "pending",
+          serviceName: jobNotification.serviceName,
+          customerName: jobNotification.customerName,
+          address: jobNotification.address,
+          amount: jobNotification.amount,
+          urgency: jobNotification.urgency,
+          createdAt: jobNotification.createdAt,
+          serviceTypes: [jobNotification.serviceName] // For compatibility
+        };
+      }
+    }
 
     if (!jobOffer) {
       return NextResponse.json(
@@ -65,28 +98,45 @@ export async function POST(request: Request) {
       );
     }
 
-    // Update job offer status
-    await db.collection("jobOffers").updateOne(
-      { _id: jobOffer._id },
-      { 
-        $set: { 
-          status: "rejected",
-          technicianId: technician._id.toString(),
-          technicianName: technician.name,
-          rejectedAt: new Date(),
-          rejectionReason: reason || "No reason provided"
-        } 
-      }
-    );
+    // Update job offer or job notification status
+    if (jobNotification) {
+      // Update job notification status
+      await db.collection("job_notifications").updateOne(
+        { _id: jobOffer._id },
+        {
+          $set: {
+            status: "rejected",
+            rejectedBy: technician._id.toString(),
+            technicianName: technician.name,
+            rejectedAt: new Date(),
+            rejectionReason: reason || "No reason provided"
+          }
+        }
+      );
+    } else {
+      // Update job offer status
+      await db.collection("jobOffers").updateOne(
+        { _id: jobOffer._id },
+        {
+          $set: {
+            status: "rejected",
+            technicianId: technician._id.toString(),
+            technicianName: technician.name,
+            rejectedAt: new Date(),
+            rejectionReason: reason || "No reason provided"
+          }
+        }
+      );
+    }
 
     // Update technician's last active timestamp
     await db.collection("technicians").updateOne(
       { _id: technician._id },
-      { 
-        $set: { 
+      {
+        $set: {
           lastActive: new Date(),
           updatedAt: new Date()
-        } 
+        }
       }
     );
 
@@ -132,21 +182,23 @@ export async function POST(request: Request) {
       await db.collection("jobOffers").insertOne(newJobOffer);
     } else {
       // If no other technician is available, update booking status
+      const bookingQuery = ObjectId.isValid(jobOffer.bookingId)
+        ? { _id: new ObjectId(jobOffer.bookingId) }
+        : { bookingId: jobOffer.bookingId };
+
       await db.collection("bookings").updateOne(
-        { _id: new ObjectId(jobOffer.bookingId) },
-        { 
-          $set: { 
+        bookingQuery,
+        {
+          $set: {
             status: "pending",
             updatedAt: new Date(),
             noTechnicianAvailable: true
-          } 
+          }
         }
       );
 
       // Create notification for customer
-      const booking = await db.collection("bookings").findOne({
-        _id: new ObjectId(jobOffer.bookingId)
-      });
+      const booking = await db.collection("bookings").findOne(bookingQuery);
 
       if (booking) {
         const customerNotification = {

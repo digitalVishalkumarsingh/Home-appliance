@@ -19,7 +19,7 @@ export async function GET(
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -56,7 +56,7 @@ export async function GET(
     const query: any = {
       technician: technician.name
     };
-    
+
     if (status) {
       query.status = status;
     }

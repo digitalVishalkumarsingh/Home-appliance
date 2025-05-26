@@ -68,12 +68,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find job offer
-    const jobOffer = await db.collection("jobOffers").findOne({
+    // Find job offer or job notification
+    let jobOffer = await db.collection("jobOffers").findOne({
       _id: new ObjectId(jobId),
       technicianId: technician._id.toString(),
       status: "pending",
     });
+
+    // If not found in jobOffers, check job_notifications
+    let jobNotification = null;
+    if (!jobOffer) {
+      if (ObjectId.isValid(jobId)) {
+        jobNotification = await db.collection("job_notifications").findOne({
+          _id: new ObjectId(jobId),
+          status: "pending"
+        });
+      } else {
+        jobNotification = await db.collection("job_notifications").findOne({
+          _id: jobId,
+          status: "pending"
+        });
+      }
+
+      if (jobNotification) {
+        // Convert job notification to job offer format for compatibility
+        jobOffer = {
+          _id: jobNotification._id,
+          bookingId: jobNotification.bookingId,
+          technicianId: technician._id.toString(),
+          status: "pending",
+          serviceName: jobNotification.serviceName,
+          customerName: jobNotification.customerName,
+          address: jobNotification.address,
+          amount: jobNotification.amount,
+          urgency: jobNotification.urgency,
+          createdAt: jobNotification.createdAt
+        };
+      }
+    }
     if (!jobOffer) {
       logger.warn("Job offer not found or already processed", { jobId, technicianId: technician._id.toString() });
       return NextResponse.json(
@@ -97,26 +129,48 @@ export async function POST(request: NextRequest) {
     const session = client.startSession();
     try {
       await session.withTransaction(async () => {
-        // Update job offer status
-        const jobUpdateResult = await db.collection("jobOffers").updateOne(
-          { _id: jobOffer._id },
-          {
-            $set: {
-              status: "accepted",
-              technicianId: technician._id.toString(),
-              technicianName: technician.name,
-              acceptedAt: now,
+        // Update job offer or job notification status
+        let jobUpdateResult;
+        if (jobNotification) {
+          // Update job notification status
+          jobUpdateResult = await db.collection("job_notifications").updateOne(
+            { _id: jobOffer._id },
+            {
+              $set: {
+                status: "accepted",
+                acceptedBy: technician._id.toString(),
+                technicianName: technician.name,
+                acceptedAt: now,
+              },
             },
-          },
-          { session }
-        );
+            { session }
+          );
+        } else {
+          // Update job offer status
+          jobUpdateResult = await db.collection("jobOffers").updateOne(
+            { _id: jobOffer._id },
+            {
+              $set: {
+                status: "accepted",
+                technicianId: technician._id.toString(),
+                technicianName: technician.name,
+                acceptedAt: now,
+              },
+            },
+            { session }
+          );
+        }
         if (jobUpdateResult.modifiedCount === 0) {
-          throw new Error("Failed to update job offer status");
+          throw new Error("Failed to update job status");
         }
 
         // Update booking with technician assignment
+        const bookingQuery = ObjectId.isValid(jobOffer.bookingId)
+          ? { _id: new ObjectId(jobOffer.bookingId) }
+          : { bookingId: jobOffer.bookingId };
+
         const bookingUpdateResult = await db.collection("bookings").updateOne(
-          { _id: new ObjectId(jobOffer.bookingId) },
+          bookingQuery,
           {
             $set: {
               status: "assigned",
@@ -186,7 +240,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate earnings
-    const booking = await db.collection("bookings").findOne({ _id: new ObjectId(jobOffer.bookingId) });
+    const bookingQuery = ObjectId.isValid(jobOffer.bookingId)
+      ? { _id: new ObjectId(jobOffer.bookingId) }
+      : { bookingId: jobOffer.bookingId };
+    const booking = await db.collection("bookings").findOne(bookingQuery);
     const settingsDoc = await db.collection("settings").findOne({ key: "commission" });
     const adminCommissionPercentage = settingsDoc?.value || 30; // Default to 30%
     const totalAmount = booking?.amount || 0;

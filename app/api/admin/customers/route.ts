@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
     // Build query
     const query: any = { role: "user" };
-    
+
     // Add search functionality
     if (search) {
       query.$or = [

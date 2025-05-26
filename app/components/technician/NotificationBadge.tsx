@@ -65,11 +65,12 @@ export default function NotificationBadge() {
         throw new Error("Authentication required");
       }
 
-      const response = await fetch(`${API_URL}/technicians/notifications/count`, {
+      const response = await fetch(`/api/technicians/notifications/count`, {
         method: "GET",
+        credentials: 'include', // Include cookies in the request
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
       });
 

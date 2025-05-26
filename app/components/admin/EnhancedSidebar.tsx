@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+// Removed framer-motion for better performance
 import {
   FaHome,
   FaCalendarAlt,
@@ -223,116 +223,51 @@ export default function EnhancedSidebar({
     }
   };
 
-  // Animation variants
-  const sidebarVariants = {
-    open: {
-      width: isCollapsed ? "80px" : "280px",
-      x: 0,
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-        duration: 0.3
-      }
-    },
-    closed: {
-      width: isMobile ? "0px" : "0px",
-      x: "-100%",
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-        duration: 0.3
-      }
-    }
-  };
-
-  const itemVariants = {
-    open: { opacity: 1, x: 0, transition: { duration: 0.2 } },
-    closed: { opacity: 0, x: -10, transition: { duration: 0.2 } }
-  };
-
-  const childVariants = {
-    open: {
-      height: "auto",
-      opacity: 1,
-      transition: {
-        duration: 0.3,
-        staggerChildren: 0.05,
-        when: "beforeChildren"
-      }
-    },
-    closed: {
-      height: 0,
-      opacity: 0,
-      transition: {
-        duration: 0.3,
-        when: "afterChildren"
-      }
-    }
-  };
+  // Removed animation variants for better performance
 
   return (
     <>
       {/* Mobile overlay */}
-      <AnimatePresence>
-        {isMobile && isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-0 bg-gray-600 bg-opacity-75 z-40 lg:hidden"
-            onClick={toggleSidebar}
-          />
-        )}
-      </AnimatePresence>
+      {isMobile && isOpen && (
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-75 z-40 lg:hidden"
+          onClick={toggleSidebar}
+        />
+      )}
 
       {/* Sidebar */}
-      <motion.div
+      <div
         ref={sidebarRef}
-        className="fixed inset-y-0 left-0 flex flex-col bg-gradient-to-br from-indigo-900 via-blue-800 to-blue-900 text-white z-50 shadow-2xl overflow-hidden"
-        variants={sidebarVariants}
-        animate={isOpen ? "open" : "closed"}
-        initial={false}
+        className={`fixed inset-y-0 left-0 flex flex-col bg-white border-r border-gray-200 z-50 overflow-hidden transition-transform duration-200 ${
+          isMobile ? (isOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"
+        } ${isCollapsed ? "w-16" : "w-64"}`}
       >
         {/* Sidebar header */}
-        <div className="flex items-center justify-between h-20 px-6 border-b border-indigo-700/50 bg-indigo-900/30 backdrop-blur-sm">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           {!isCollapsed && (
             <Link href="/admin/dashboard" className="flex items-center">
-              <div className="relative">
-                <img
-                  src="/Dizit-Solution.webp"
-                  alt="Dizit Solutions Logo"
-                  className="h-10 w-auto rounded-md"
-                />
-                <div className="absolute -inset-0.5 rounded-md bg-blue-500/20 blur-sm -z-10"></div>
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">D</span>
+                </div>
+                <span className="ml-3 text-lg font-semibold text-gray-900">
+                  Dizit Admin
+                </span>
               </div>
-              <motion.span
-                variants={itemVariants}
-                className="ml-3 text-lg font-bold text-white tracking-wide"
-              >
-                Dizit Admin
-              </motion.span>
             </Link>
           )}
 
           {isCollapsed && (
             <Link href="/admin/dashboard" className="flex items-center justify-center w-full">
-              <div className="relative">
-                <img
-                  src="/logo-fallback.svg"
-                  alt="Dizit Solutions Logo"
-                  className="h-10 w-auto rounded-md"
-                />
-                <div className="absolute -inset-0.5 rounded-md bg-blue-500/20 blur-sm -z-10"></div>
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">D</span>
               </div>
             </Link>
           )}
 
           {isMobile && (
             <button
-              className="text-white p-2 rounded-md hover:bg-indigo-700/50 transition-colors"
+              className="text-gray-500 p-2 rounded-md hover:bg-gray-100 transition-colors"
               onClick={toggleSidebar}
             >
               <FaTimes className="h-5 w-5" />
@@ -341,165 +276,147 @@ export default function EnhancedSidebar({
         </div>
 
         {/* User profile section */}
-        <div className={`px-6 py-5 border-b border-indigo-700/50 bg-indigo-800/20 ${isCollapsed ? 'flex justify-center' : ''}`}>
+        <div className={`px-6 py-4 border-b border-gray-200 ${isCollapsed ? 'flex justify-center' : ''}`}>
           {!isCollapsed ? (
             <div className="flex items-center">
               <div className="flex-shrink-0 relative">
                 {userAvatar ? (
                   <img
-                    className="h-12 w-12 rounded-full ring-2 ring-blue-400/30"
+                    className="h-10 w-10 rounded-full"
                     src={userAvatar}
                     alt={userName}
                   />
                 ) : (
-                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center ring-2 ring-blue-400/30 shadow-lg">
-                    <FaUser className="h-5 w-5 text-white" />
+                  <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                    <FaUser className="h-5 w-5 text-gray-500" />
                   </div>
                 )}
-                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 ring-2 ring-indigo-900"></span>
+                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-400 ring-2 ring-white"></span>
               </div>
-              <motion.div variants={itemVariants} className="ml-4">
-                <p className="text-base font-medium text-white">{userName}</p>
-                <p className="text-xs text-blue-200 mt-0.5">{userRole}</p>
-              </motion.div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900">{userName}</p>
+                <p className="text-xs text-gray-500">{userRole}</p>
+              </div>
             </div>
           ) : (
             <div className="flex-shrink-0 relative">
               {userAvatar ? (
                 <img
-                  className="h-12 w-12 rounded-full ring-2 ring-blue-400/30"
+                  className="h-10 w-10 rounded-full"
                   src={userAvatar}
                   alt={userName}
                 />
               ) : (
-                <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center ring-2 ring-blue-400/30 shadow-lg">
-                  <FaUser className="h-5 w-5 text-white" />
+                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                  <FaUser className="h-5 w-5 text-gray-500" />
                 </div>
               )}
-              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 ring-2 ring-indigo-900"></span>
+              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-400 ring-2 ring-white"></span>
             </div>
           )}
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto py-4">
-          <nav className="px-4 space-y-1.5">
+        <div className="flex-1 overflow-y-auto py-2">
+          <nav className="px-3 space-y-1">
             {navigation.map((item) => (
               <div key={item.name} className="group">
                 {item.children ? (
                   <div>
                     <button
-                      className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded ${
                         isActive(item.href)
-                          ? "bg-indigo-700/70 text-white shadow-md shadow-indigo-900/20"
-                          : "text-blue-100 hover:bg-indigo-800/50 hover:shadow-md hover:shadow-indigo-900/10"
+                          ? "bg-blue-50 text-blue-700"
+                          : "text-gray-700 hover:bg-gray-50"
                       }`}
                       onClick={() => toggleSection(item.name)}
                     >
                       <div className="flex items-center">
                         <div className={`${isCollapsed ? 'mx-auto' : 'mr-3'} ${
                           isActive(item.href)
-                            ? "bg-indigo-600 text-white"
-                            : "bg-indigo-800/50 text-blue-300 group-hover:bg-indigo-700/70 group-hover:text-white"
-                          } h-8 w-8 rounded-md flex items-center justify-center transition-colors duration-200`}>
+                            ? "text-blue-600"
+                            : "text-gray-400"
+                          }`}>
                           <item.icon className="h-4 w-4" />
                         </div>
                         {!isCollapsed && (
-                          <motion.span variants={itemVariants} className="font-medium">
+                          <span className="font-medium">
                             {item.name}
-                          </motion.span>
+                          </span>
                         )}
                       </div>
                       {!isCollapsed && item.badge && (
-                        <motion.span
-                          variants={itemVariants}
-                          className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full"
-                        >
+                        <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
                           {item.badge}
-                        </motion.span>
+                        </span>
                       )}
                       {!isCollapsed && (
-                        <motion.span variants={itemVariants} className="text-blue-300 group-hover:text-white transition-colors duration-200">
+                        <span className="text-gray-400">
                           {expandedSections[item.name] ? (
-                            <FaAngleDown className="h-4 w-4" />
+                            <FaAngleDown className="h-3 w-3" />
                           ) : (
-                            <FaAngleRight className="h-4 w-4" />
+                            <FaAngleRight className="h-3 w-3" />
                           )}
-                        </motion.span>
+                        </span>
                       )}
                     </button>
-                    {!isCollapsed && (
-                      <AnimatePresence>
-                        {expandedSections[item.name] && (
-                          <motion.div
-                            initial="closed"
-                            animate="open"
-                            exit="closed"
-                            variants={childVariants}
-                            className="overflow-hidden"
+                    {!isCollapsed && expandedSections[item.name] && (
+                      <div className="pl-8 pr-2 py-1 space-y-1 mt-1">
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.name}
+                            href={child.href}
+                            className={`flex items-center justify-between px-3 py-2 text-sm font-medium rounded ${
+                              isActive(child.href) && pathname !== "/admin/dashboard"
+                                ? "bg-blue-50 text-blue-700"
+                                : "text-gray-600 hover:bg-gray-50"
+                            }`}
                           >
-                            <div className="pl-12 pr-2 py-1 space-y-1 mt-1">
-                              {item.children.map((child) => (
-                                <Link
-                                  key={child.name}
-                                  href={child.href}
-                                  className={`flex items-center justify-between px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                                    isActive(child.href) && pathname !== "/admin/dashboard"
-                                      ? "bg-indigo-700/50 text-white shadow-sm"
-                                      : "text-blue-200 hover:bg-indigo-800/30 hover:text-white"
-                                  }`}
-                                >
-                                  <div className="flex items-center">
-                                    <child.icon
-                                      className={`mr-3 h-4 w-4 ${
-                                        isActive(child.href) ? "text-blue-300" : "text-blue-400"
-                                      }`}
-                                    />
-                                    <span>{child.name}</span>
-                                  </div>
-                                  {child.badge && (
-                                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
-                                      {child.badge}
-                                    </span>
-                                  )}
-                                </Link>
-                              ))}
+                            <div className="flex items-center">
+                              <child.icon
+                                className={`mr-3 h-3 w-3 ${
+                                  isActive(child.href) ? "text-blue-600" : "text-gray-400"
+                                }`}
+                              />
+                              <span>{child.name}</span>
                             </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                            {child.badge && (
+                              <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                                {child.badge}
+                              </span>
+                            )}
+                          </Link>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ) : (
                   <Link
                     href={item.href}
-                    className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2 text-sm font-medium rounded ${
                       isActive(item.href)
-                        ? "bg-indigo-700/70 text-white shadow-md shadow-indigo-900/20"
-                        : "text-blue-100 hover:bg-indigo-800/50 hover:shadow-md hover:shadow-indigo-900/10"
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-gray-700 hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-center">
                       <div className={`${isCollapsed ? 'mx-auto' : 'mr-3'} ${
                         isActive(item.href)
-                          ? "bg-indigo-600 text-white"
-                          : "bg-indigo-800/50 text-blue-300 group-hover:bg-indigo-700/70 group-hover:text-white"
-                        } h-8 w-8 rounded-md flex items-center justify-center transition-colors duration-200`}>
+                          ? "text-blue-600"
+                          : "text-gray-400"
+                        }`}>
                         <item.icon className="h-4 w-4" />
                       </div>
                       {!isCollapsed && (
-                        <motion.span variants={itemVariants} className="font-medium">
+                        <span className="font-medium">
                           {item.name}
-                        </motion.span>
+                        </span>
                       )}
                     </div>
                     {!isCollapsed && item.badge && (
-                      <motion.span
-                        variants={itemVariants}
-                        className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full"
-                      >
+                      <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
                         {item.badge}
-                      </motion.span>
+                      </span>
                     )}
                   </Link>
                 )}
@@ -509,61 +426,27 @@ export default function EnhancedSidebar({
         </div>
 
         {/* Sidebar footer */}
-        <div className="p-6 border-t border-indigo-700/50 bg-indigo-900/30 backdrop-blur-sm">
+        <div className="p-4 border-t border-gray-200">
           {!isCollapsed ? (
-            <div className="space-y-3">
-              {toggleDarkMode && (
-                <button
-                  onClick={toggleDarkMode}
-                  className="flex items-center w-full px-4 py-2.5 text-sm font-medium text-blue-100 rounded-lg hover:bg-indigo-700/50 transition-all duration-200 shadow-sm hover:shadow-md"
-                >
-                  <div className="bg-indigo-800/50 h-8 w-8 rounded-md flex items-center justify-center mr-3">
-                    {isDarkMode ? (
-                      <FaSun className="h-4 w-4 text-blue-300" />
-                    ) : (
-                      <FaMoon className="h-4 w-4 text-blue-300" />
-                    )}
-                  </div>
-                  <motion.span variants={itemVariants}>
-                    {isDarkMode ? "Light Mode" : "Dark Mode"}
-                  </motion.span>
-                </button>
-              )}
+            <div className="space-y-2">
               <button
                 onClick={onLogout}
-                className="flex items-center w-full px-4 py-2.5 text-sm font-medium text-blue-100 rounded-lg hover:bg-indigo-700/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                className="flex items-center w-full px-3 py-2 text-sm font-medium text-gray-700 rounded hover:bg-gray-50"
               >
-                <div className="bg-indigo-800/50 h-8 w-8 rounded-md flex items-center justify-center mr-3">
-                  <FaSignOutAlt className="h-4 w-4 text-blue-300" />
+                <div className="text-gray-400 mr-3">
+                  <FaSignOutAlt className="h-4 w-4" />
                 </div>
-                <motion.span variants={itemVariants}>Sign out</motion.span>
+                <span>Sign out</span>
               </button>
             </div>
           ) : (
-            <div className="flex flex-col items-center space-y-4">
-              {toggleDarkMode && (
-                <button
-                  onClick={toggleDarkMode}
-                  className="p-2 text-blue-100 rounded-lg hover:bg-indigo-700/50 transition-all duration-200 shadow-sm hover:shadow-md"
-                  title={isDarkMode ? "Light Mode" : "Dark Mode"}
-                >
-                  <div className="bg-indigo-800/50 h-8 w-8 rounded-md flex items-center justify-center">
-                    {isDarkMode ? (
-                      <FaSun className="h-4 w-4 text-blue-300" />
-                    ) : (
-                      <FaMoon className="h-4 w-4 text-blue-300" />
-                    )}
-                  </div>
-                </button>
-              )}
+            <div className="flex flex-col items-center">
               <button
                 onClick={onLogout}
-                className="p-2 text-blue-100 rounded-lg hover:bg-indigo-700/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                className="p-2 text-gray-400 rounded hover:bg-gray-50 hover:text-gray-600"
                 title="Sign out"
               >
-                <div className="bg-indigo-800/50 h-8 w-8 rounded-md flex items-center justify-center">
-                  <FaSignOutAlt className="h-4 w-4 text-blue-300" />
-                </div>
+                <FaSignOutAlt className="h-4 w-4" />
               </button>
             </div>
           )}
@@ -573,7 +456,7 @@ export default function EnhancedSidebar({
         {!isMobile && (
           <button
             onClick={toggleCollapse}
-            className="absolute top-1/2 -right-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white p-1.5 rounded-full shadow-lg hover:shadow-indigo-500/30 transition-all duration-200 border-2 border-indigo-900/20"
+            className="absolute top-1/2 -right-3 bg-white border border-gray-200 text-gray-600 p-1.5 rounded-full shadow-sm hover:shadow-md transition-all duration-200"
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? (
@@ -583,7 +466,7 @@ export default function EnhancedSidebar({
             )}
           </button>
         )}
-      </motion.div>
+      </div>
     </>
   );
 }

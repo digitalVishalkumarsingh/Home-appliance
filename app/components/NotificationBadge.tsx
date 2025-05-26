@@ -67,7 +67,7 @@ export default function NotificationBadge() {
     return null;
   };
 
-  // Fetch notifications from API
+  // Fetch notifications from API with fallback support
   const fetchNotifications = async () => {
     try {
       setLoading(true);
@@ -78,14 +78,18 @@ export default function NotificationBadge() {
         return;
       }
 
-      const response = await fetch("/api/user/notifications?limit=5", {
+      // Try main notifications endpoint first
+      let response = await fetch("/api/user/notifications?limit=5&unreadOnly=true", {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
 
+      // If main endpoint fails, try fallback
       if (!response.ok) {
+        console.log("Main notifications endpoint failed, trying fallback...");
+
         // Check if token expired
         if (response.status === 401) {
           // Token might be expired, but don't log out the user immediately
@@ -94,13 +98,33 @@ export default function NotificationBadge() {
           setUnreadCount(0);
           return;
         }
-        throw new Error("Failed to fetch notifications");
+
+        // Try fallback endpoint
+        try {
+          response = await fetch("/api/notifications/fallback?limit=5&unreadOnly=true");
+          if (!response.ok) {
+            throw new Error("Both main and fallback endpoints failed");
+          }
+        } catch (fallbackError) {
+          console.error("Fallback notifications also failed:", fallbackError);
+          // Silently fail - don't show errors to user for notifications
+          if (isMounted) {
+            setNotifications([]);
+            setUnreadCount(0);
+          }
+          return;
+        }
       }
 
       const data = await response.json();
       if (isMounted) {
         setNotifications(data.notifications || []);
         setUnreadCount(data.unreadCount || 0);
+
+        // Log if using fallback data
+        if (data.fallback) {
+          console.log("Using fallback notifications data");
+        }
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);

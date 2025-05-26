@@ -42,6 +42,9 @@ const MockRazorpayCheckout: React.FC<MockRazorpayCheckoutProps> = ({
   const [cardCvv, setCardCvv] = useState('');
   const [cardName, setCardName] = useState('');
   const [selectedBank, setSelectedBank] = useState('');
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentFailed, setPaymentFailed] = useState(false);
 
   // Format amount for display
   // Razorpay sends amount in paise, so we need to convert it back to rupees for display
@@ -51,6 +54,56 @@ const MockRazorpayCheckout: React.FC<MockRazorpayCheckoutProps> = ({
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(amount / 100);
+
+  // Validation functions
+  const validateCardNumber = (number: string): boolean => {
+    const cleaned = number.replace(/\s/g, '');
+    return cleaned.length >= 13 && cleaned.length <= 19 && /^\d+$/.test(cleaned);
+  };
+
+  const validateCardExpiry = (expiry: string): boolean => {
+    const regex = /^(0[1-9]|1[0-2])\/\d{2}$/;
+    if (!regex.test(expiry)) return false;
+
+    const [month, year] = expiry.split('/');
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear() % 100;
+    const currentMonth = currentDate.getMonth() + 1;
+
+    const expYear = parseInt(year);
+    const expMonth = parseInt(month);
+
+    if (expYear < currentYear || (expYear === currentYear && expMonth < currentMonth)) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const validateCardCvv = (cvv: string): boolean => {
+    return /^\d{3,4}$/.test(cvv);
+  };
+
+  const validateUpiId = (upi: string): boolean => {
+    const upiRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$/;
+    return upiRegex.test(upi);
+  };
+
+  // Format card number with spaces
+  const formatCardNumber = (value: string): string => {
+    const cleaned = value.replace(/\s/g, '');
+    const match = cleaned.match(/.{1,4}/g);
+    return match ? match.join(' ') : cleaned;
+  };
+
+  // Format expiry date
+  const formatExpiry = (value: string): string => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length >= 2) {
+      return cleaned.substring(0, 2) + '/' + cleaned.substring(2, 4);
+    }
+    return cleaned;
+  };
 
   const paymentMethods = [
     { id: 'card', name: 'Card', icon: <FaCreditCard />, description: 'Credit & Debit Cards' },

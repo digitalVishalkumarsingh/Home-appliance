@@ -202,42 +202,70 @@ export function hasRole(user: JwtPayload | null, roles: string[]): boolean {
   return roles.includes(user.role);
 }
 
-export function getTokenFromRequest(request: NextRequest): string {
+// Overloaded function to handle both Request and NextRequest
+export function getTokenFromRequest(request: Request | NextRequest): string {
   try {
     if (!request || !request.headers) {
       logger.warn("Invalid request object provided to getTokenFromRequest");
       throw new AuthError("Invalid request object", "INVALID_REQUEST");
     }
 
-    // Debug: Log all cookies
-    const allCookies = request.cookies.getAll();
-    console.log("getTokenFromRequest - All cookies:", allCookies.map(c => ({ name: c.name, hasValue: !!c.value })));
+    // Check if it's a NextRequest (has cookies.getAll method)
+    if ('cookies' in request && typeof request.cookies.getAll === 'function') {
+      // Handle NextRequest
+      const nextRequest = request as NextRequest;
 
-    // First try the main httpOnly token cookie
-    const token = request.cookies.get("token")?.value;
-    if (token) {
-      console.log("getTokenFromRequest - Token found in main cookie");
-      logger.debug("Token extracted from NextRequest cookies (httpOnly)");
-      return token;
+      // Debug: Log all cookies
+      const allCookies = nextRequest.cookies.getAll();
+      console.log("getTokenFromRequest - All cookies:", allCookies.map(c => ({ name: c.name, hasValue: !!c.value })));
+
+      // First try the main httpOnly token cookie
+      const token = nextRequest.cookies.get("token")?.value;
+      if (token) {
+        console.log("getTokenFromRequest - Token found in main cookie");
+        logger.debug("Token extracted from NextRequest cookies (httpOnly)");
+        return token;
+      }
+
+      // Try auth_token cookie (non-httpOnly for navigation)
+      const authToken = nextRequest.cookies.get("auth_token")?.value;
+      if (authToken) {
+        console.log("getTokenFromRequest - Token found in auth_token cookie");
+        logger.debug("Token extracted from auth_token cookie");
+        return authToken;
+      }
+
+      // Try backup token cookie (for debugging/fallback)
+      const backupToken = nextRequest.cookies.get("token_backup")?.value;
+      if (backupToken) {
+        console.log("getTokenFromRequest - Token found in backup cookie");
+        logger.debug("Token extracted from backup cookie");
+        return backupToken;
+      }
+    } else {
+      // Handle regular Request - parse cookies manually
+      const cookieHeader = request.headers.get('Cookie');
+      if (cookieHeader) {
+        console.log("getTokenFromRequest - Parsing cookies from header");
+        const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+          const [key, value] = cookie.trim().split('=');
+          if (key && value) {
+            acc[key] = value;
+          }
+          return acc;
+        }, {} as Record<string, string>);
+
+        // Try different cookie names
+        const token = cookies.token || cookies.auth_token || cookies.token_backup;
+        if (token) {
+          console.log("getTokenFromRequest - Token found in cookies");
+          logger.debug("Token extracted from Request cookies");
+          return token;
+        }
+      }
     }
 
-    // Try auth_token cookie (non-httpOnly for navigation)
-    const authToken = request.cookies.get("auth_token")?.value;
-    if (authToken) {
-      console.log("getTokenFromRequest - Token found in auth_token cookie");
-      logger.debug("Token extracted from auth_token cookie");
-      return authToken;
-    }
-
-    // Try backup token cookie (for debugging/fallback)
-    const backupToken = request.cookies.get("token_backup")?.value;
-    if (backupToken) {
-      console.log("getTokenFromRequest - Token found in backup cookie");
-      logger.debug("Token extracted from backup cookie");
-      return backupToken;
-    }
-
-    // Try Authorization header
+    // Try Authorization header for both request types
     const authHeader = request.headers.get("Authorization");
     if (authHeader) {
       console.log("getTokenFromRequest - Checking Authorization header");

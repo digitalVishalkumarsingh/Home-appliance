@@ -10,7 +10,7 @@ import DiscountSelector from './DiscountSelector';
 import FirstTimeOfferBanner from './FirstTimeOfferBanner';
 import LocationFinder from './LocationFinder';
 import useAuth from '@/app/hooks/useAuth';
-import { FaMapMarkerAlt } from 'react-icons/fa';
+// Removed unused import
 import React from 'react';
 
 interface UserProfile {
@@ -26,9 +26,7 @@ interface OrderData {
   currency: string;
 }
 
-interface AuthState {
-  isAdmin: boolean;
-}
+// Removed unused interface
 
 interface BookingPageProps {
   isOpen: boolean;
@@ -119,16 +117,16 @@ const BookingPage: React.FC<BookingPageProps> = ({
 
   // Removed technician selection - technicians will accept jobs after booking
 
-  // Generate available time slots
+  // Generate available time slots for 24/7 service
   const generateTimeSlots = () => {
     const slots = [];
-    for (let hour = 9; hour <= 20; hour++) {
-      const hourStr = hour > 12 ? (hour - 12) : hour;
+    // Generate slots for 24 hours
+    for (let hour = 0; hour < 24; hour++) {
+      const hourStr = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
       const ampm = hour >= 12 ? 'PM' : 'AM';
-      slots.push(`${hourStr}:00 ${ampm}`);
-      if (hour < 20) {
-        slots.push(`${hourStr}:30 ${ampm}`);
-      }
+      const displayHour = hour === 0 ? 12 : hourStr;
+      slots.push(`${displayHour}:00 ${ampm}`);
+      slots.push(`${displayHour}:30 ${ampm}`);
     }
     return slots;
   };
@@ -154,14 +152,34 @@ const BookingPage: React.FC<BookingPageProps> = ({
     try {
       // If cash payment, create booking directly without payment processing
       if (paymentMethod === 'cash') {
+        console.log('Processing cash booking...');
+        console.log('Current state:', {
+          name, email, phone, address, date, time,
+          originalPrice, numericPrice, appliedDiscount
+        });
+
+        // Validate required fields
+        if (!name || !email || !phone || !address || !date || !time) {
+          throw new Error('Please fill in all required fields');
+        }
+
+        if (!originalPrice || !numericPrice) {
+          throw new Error('Price information is missing');
+        }
+
+        if (!service || !service.id || !service.title) {
+          throw new Error('Service information is missing');
+        }
+
         const token = localStorage.getItem('token');
-        const bookingResponse = await fetch('/api/bookings/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token || ''}`,
-          },
-          body: JSON.stringify({
+
+        if (!token) {
+          throw new Error('Please log in to create a booking');
+        }
+
+        let bookingPayload;
+        try {
+          bookingPayload = {
             serviceId: service.id,
             serviceName: service.title,
             servicePrice: numericPrice,
@@ -169,29 +187,85 @@ const BookingPage: React.FC<BookingPageProps> = ({
             customerEmail: email,
             customerPhone: phone,
             address: address,
-            location: location,
+            location: location || null,
             scheduledDate: date,
             scheduledTime: time,
             notes: '',
             paymentMethod: 'cash',
             originalPrice: originalPrice,
             discountApplied: appliedDiscount ? true : false,
-            discountId: appliedDiscount ? appliedDiscount._id : null,
-            discountName: appliedDiscount ? appliedDiscount.name : null,
-            discountAmount: appliedDiscount ? appliedDiscount.discountAmount : 0,
-          }),
+            discountId: appliedDiscount ? (appliedDiscount._id || null) : null,
+            discountName: appliedDiscount ? (appliedDiscount.name || appliedDiscount.title || null) : null,
+            discountAmount: appliedDiscount ? (appliedDiscount.discountAmount || 0) : 0,
+          };
+        } catch (payloadError) {
+          console.error('Error creating booking payload:', payloadError);
+          throw new Error('Failed to prepare booking data');
+        }
+
+        console.log('Booking payload:', bookingPayload);
+
+        const bookingResponse = await fetch('/api/bookings/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(bookingPayload),
         });
 
-        const bookingData = await bookingResponse.json();
+        console.log('Booking response status:', bookingResponse.status);
+
+        let bookingData;
+        try {
+          bookingData = await bookingResponse.json();
+          console.log('Booking response data:', bookingData);
+        } catch (parseError) {
+          console.error('Error parsing booking response:', parseError);
+          throw new Error('Invalid response from booking service');
+        }
 
         if (!bookingResponse.ok) {
-          throw new Error(bookingData.message || 'Failed to create booking');
+          console.error('Booking creation failed:', bookingData);
+          throw new Error(bookingData.message || `Failed to create booking: ${bookingResponse.status}`);
+        }
+
+        // Notify technicians about the new booking
+        try {
+          console.log('Notifying technicians about new booking...');
+          const notifyResponse = await fetch('/api/bookings/notify-technicians', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              bookingId: bookingData.bookingId,
+              serviceName: service.title,
+              customerName: name,
+              address: address,
+              amount: numericPrice,
+              urgency: 'normal'
+            }),
+          });
+
+          const notifyData = await notifyResponse.json();
+          console.log('Technician notification result:', notifyData);
+
+          if (notifyData.success) {
+            console.log('Technicians notified successfully');
+          } else {
+            console.warn('Failed to notify technicians:', notifyData.message);
+          }
+        } catch (notifyError) {
+          console.error('Error notifying technicians:', notifyError);
+          // Don't fail the booking if notification fails
         }
 
         // For cash payments, show success immediately
-        onPaymentSuccess('cash_payment', bookingData.booking.bookingId);
+        const bookingId = bookingData.bookingId || bookingData.booking?.bookingId || 'CASH_' + Date.now();
+        onPaymentSuccess('cash_payment', bookingId);
         onClose();
-        toast.success('Booking confirmed! A technician will contact you soon. Payment will be collected in cash.');
+        toast.success('🎉 Booking confirmed! A technician will contact you soon. Payment will be collected in cash.');
         setLoading(false);
         return;
       }
@@ -261,13 +335,14 @@ const BookingPage: React.FC<BookingPageProps> = ({
     }
   };
 
-  const handlePaymentSuccess = (paymentId: string, orderId: string) => {
-    console.log('Payment successful:', { paymentId, orderId });
+  const handlePaymentSuccess = (paymentId: string, orderId: string, signature: string) => {
+    console.log('Payment successful:', { paymentId, orderId, signature });
 
     const lastTransactionId = sessionStorage.getItem('lastTransactionId') || `tx_${Date.now()}`;
     savePaymentDetails({
       razorpay_payment_id: paymentId,
       razorpay_order_id: orderId,
+      razorpay_signature: signature,
       transactionId: lastTransactionId,
       service: service.title,
       amount: numericPrice,
@@ -279,9 +354,10 @@ const BookingPage: React.FC<BookingPageProps> = ({
       bookingDate: date,
       bookingTime: time,
       discountApplied: appliedDiscount ? true : false,
-      discountId: appliedDiscount ? appliedDiscount._id : null,
-      discountName: appliedDiscount ? appliedDiscount.name : null,
-      discountAmount: appliedDiscount ? appliedDiscount.discountAmount : 0
+      discountId: appliedDiscount ? (appliedDiscount._id || null) : null,
+      discountName: appliedDiscount ? (appliedDiscount.name || appliedDiscount.title || null) : null,
+      discountAmount: appliedDiscount ? (appliedDiscount.discountAmount || 0) : 0,
+      customerLocation: location ? { lat: location.lat, lng: location.lng } : null
     });
   };
 

@@ -3,8 +3,21 @@ import { connectToDatabase } from "@/app/lib/mongodb";
 import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { generateRandomPassword } from "@/app/utils/passwordGenerator";
-import { sendTechnicianCredentialsEmail } from "@/app/lib/email";
+
+// Import email function with fallback
+let sendTechnicianCredentialsEmail: any;
+try {
+  const emailModule = require("@/app/lib/email");
+  sendTechnicianCredentialsEmail = emailModule.sendTechnicianCredentialsEmail;
+} catch (emailImportError) {
+  console.error("Failed to import email module:", emailImportError);
+  sendTechnicianCredentialsEmail = async () => {
+    console.log("Email module not available, skipping email sending");
+    return false;
+  };
+}
 
 // Resend password for a technician
 export async function POST(
@@ -22,7 +35,7 @@ export async function POST(
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -160,10 +173,21 @@ export async function POST(
     try {
       console.log("Attempting to send credentials email for password reset:", technician.email);
 
+      // Generate reset token for password setup
+      const resetToken = jwt.sign(
+        {
+          userId: user._id.toString(),
+          email: technician.email,
+          type: "password-setup"
+        },
+        process.env.JWT_SECRET || "fallback-secret-for-development-only",
+        { expiresIn: "24h" }
+      );
+
       emailSent = await sendTechnicianCredentialsEmail({
         name: technician.name,
         email: technician.email,
-        password: password,
+        resetToken: resetToken,
         phone: technician.phone
       });
 

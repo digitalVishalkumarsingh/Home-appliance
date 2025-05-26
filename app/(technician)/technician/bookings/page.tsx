@@ -26,20 +26,17 @@ interface BookingResponse {
 }
 
 async function fetchBookings(token: string): Promise<Booking[]> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
-  let response = await fetch(`${apiUrl}/technicians/jobs/history`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  let response = await fetch(`/api/technicians/jobs/history`, {
+    method: 'GET',
+    credentials: 'include', // Include cookies in the request
     cache: "no-store",
   });
 
   if (!response.ok) {
     console.log("Falling back to /api/bookings...");
-    response = await fetch(`${apiUrl}/bookings`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    response = await fetch(`/api/bookings`, {
+      method: 'GET',
+      credentials: 'include', // Include cookies in the request
       cache: "no-store",
     });
   }

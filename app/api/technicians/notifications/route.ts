@@ -48,13 +48,41 @@ export async function GET(request: NextRequest) {
     const { db } = await connectToDatabase({ timeoutMs: 10000 });
 
     // Find technician by userId
-    const technician = await db.collection("technicians").findOne({ userId });
+    let technician = await db.collection("technicians").findOne({ userId });
     if (!technician) {
-      logger.warn("Technician not found", { userId });
-      return NextResponse.json(
-        { success: false, message: "Technician profile not found" },
-        { status: 404 }
-      );
+      logger.warn("Technician not found, creating basic profile", { userId });
+
+      // Create a basic technician profile if it doesn't exist
+      try {
+        const newTechnician = {
+          userId,
+          name: decoded.name || "Technician",
+          email: decoded.email || "",
+          phone: "",
+          isAvailable: true,
+          rating: 0,
+          completedJobs: 0,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        const result = await db.collection("technicians").insertOne(newTechnician);
+        technician = { ...newTechnician, _id: result.insertedId };
+
+        logger.info("Created new technician profile", { userId, technicianId: result.insertedId });
+      } catch (createError) {
+        logger.error("Failed to create technician profile", { userId, error: createError });
+
+        // Return empty notifications instead of 404
+        return NextResponse.json({
+          success: true,
+          notifications: [],
+          pagination: { total: 0, page: 1, limit: 50, pages: 0 },
+          unreadCount: 0,
+          fallback: true,
+          message: "No technician profile found, showing empty notifications"
+        });
+      }
     }
 
     // Get notifications

@@ -41,7 +41,7 @@ export function truncateString(str: string, length = 50): string {
   return str.length > length ? `${str.substring(0, length)}...` : str;
 }
 
-export function debounce<T extends (...args: any[]) => any>(fn: T, delay: number) {
+export function debounce<T extends (...args: unknown[]) => unknown>(fn: T, delay: number) {
   let timeoutId: NodeJS.Timeout;
   const debounced = function (...args: Parameters<T>) {
     clearTimeout(timeoutId);
@@ -118,7 +118,7 @@ export async function getFromLocalStorage<T>(key: string, fallback: T): Promise<
   }
 }
 
-export async function setToLocalStorage(key: string, value: any): Promise<boolean> {
+export async function setToLocalStorage(key: string, value: unknown): Promise<boolean> {
   if (typeof window === "undefined") {
     await logger.warn("Attempted to write to localStorage in non-browser environment", { key });
     return false;

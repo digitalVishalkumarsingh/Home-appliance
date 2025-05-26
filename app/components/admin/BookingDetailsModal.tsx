@@ -5,18 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FaTimes,
   FaUser,
-  FaEnvelope,
-  FaPhone,
-  FaMapMarkerAlt,
   FaCalendarAlt,
-  FaClock,
   FaRupeeSign,
   FaCheck,
   FaSpinner,
   FaPrint
 } from "react-icons/fa";
 import { toast } from "react-hot-toast";
-import BookingPrintButton from "./BookingPrintTemplate";
 
 interface Booking {
   id: string;

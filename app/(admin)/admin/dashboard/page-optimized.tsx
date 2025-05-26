@@ -43,11 +43,14 @@ export default function AdminDashboardOptimized() {
 
       setLoadingProgress(10);
 
+      // First check if we have any authentication data
       const token = localStorage.getItem("token");
       const userStr = localStorage.getItem("user");
 
+      // If no localStorage data, immediately redirect to login
       if (!token || !userStr) {
-        throw new Error("No authentication data found. Please log in as admin.");
+        router.push("/admin/login");
+        return;
       }
 
       let userData: User;
@@ -56,11 +59,20 @@ export default function AdminDashboardOptimized() {
         setLoadingProgress(30);
       } catch (parseError) {
         console.error("Error parsing user data:", parseError);
-        throw new Error("Invalid user data. Please log in again.");
+        // Clear invalid data and redirect
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/admin/login");
+        return;
       }
 
+      // Check if user has admin role
       if (userData.role !== "admin") {
-        throw new Error("You don't have admin privileges.");
+        // Clear data and redirect
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/admin/login");
+        return;
       }
 
       // Validate token with API - cookies are automatically sent
@@ -72,13 +84,20 @@ export default function AdminDashboardOptimized() {
       setLoadingProgress(70);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Invalid or expired token.");
+        // Clear invalid authentication data
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/admin/login");
+        return;
       }
 
       const data = await response.json();
       if (!data.success) {
-        throw new Error("Token verification failed.");
+        // Clear invalid authentication data
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/admin/login");
+        return;
       }
 
       setUser(userData);
@@ -94,9 +113,9 @@ export default function AdminDashboardOptimized() {
       }
     } catch (error) {
       console.error("Error checking admin auth:", error);
-      toast.error(error instanceof Error ? error.message : "An error occurred. Please try again.", {
-        duration: 4000,
-      });
+      // Clear authentication data and redirect
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       router.push("/admin/login");
     }
   }, [router]);
@@ -133,19 +152,19 @@ export default function AdminDashboardOptimized() {
 
   useEffect(() => {
     const loadDashboard = async () => {
-      await checkAdminAuth();
-      if (user) {
-        await fetchStats();
+      // Run authentication and stats fetching in parallel for faster loading
+      const authPromise = checkAdminAuth();
+      const statsPromise = fetchStats();
+
+      try {
+        await Promise.all([authPromise, statsPromise]);
+      } catch (error) {
+        console.error("Error loading dashboard:", error);
       }
     };
 
     loadDashboard();
-
-    const toastId = toast.loading("Loading dashboard with real-time data...");
-    return () => {
-      toast.dismiss(toastId);
-    };
-  }, [checkAdminAuth, fetchStats, user]);
+  }, [checkAdminAuth, fetchStats]);
 
   if (isLoading) {
     return (
@@ -216,138 +235,131 @@ export default function AdminDashboardOptimized() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">Overview of your business performance</p>
-        {user && (
-          <p className="text-sm text-blue-600">Welcome, {user.name || user.email}</p>
-        )}
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 pb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-600">Welcome back! Here's what's happening with your business today.</p>
+          </div>
+          {user && (
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Welcome back,</p>
+              <p className="text-lg font-medium text-gray-900">{user.name || user.email}</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                <FaCalendarCheck className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Total Bookings</dt>
-                  <dd className="text-lg font-semibold text-gray-900">{stats.totalBookings}</dd>
-                </dl>
-              </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-white border border-gray-200 rounded p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <FaCalendarCheck className="h-5 w-5 text-blue-600" />
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm text-gray-600">Total Bookings</p>
+              <p className="text-xl font-semibold text-gray-900">{stats.totalBookings}</p>
             </div>
           </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <div className="text-sm">
-              <Link href="/admin/bookings" className="font-medium text-blue-700 hover:text-blue-900">
-                View all
-              </Link>
-            </div>
+          <div className="mt-3">
+            <Link href="/admin/bookings" className="text-sm text-blue-600 hover:text-blue-800">
+              View all →
+            </Link>
           </div>
         </div>
 
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                <FaUsers className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Total Customers</dt>
-                  <dd className="text-lg font-semibold text-gray-900">{stats.totalCustomers}</dd>
-                </dl>
-              </div>
+        <div className="bg-white border border-gray-200 rounded p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <FaUsers className="h-5 w-5 text-green-600" />
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm text-gray-600">Total Customers</p>
+              <p className="text-xl font-semibold text-gray-900">{stats.totalCustomers}</p>
             </div>
           </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <div className="text-sm">
-              <Link href="/admin/customers" className="font-medium text-blue-700 hover:text-blue-900">
-                View all
-              </Link>
-            </div>
+          <div className="mt-3">
+            <Link href="/admin/customers" className="text-sm text-green-600 hover:text-green-800">
+              View all →
+            </Link>
           </div>
         </div>
 
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-purple-500 rounded-md p-3">
-                <FaRupeeSign className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Total Revenue</dt>
-                  <dd className="text-lg font-semibold text-gray-900">
-                    ₹{new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0 }).format(stats.totalRevenue)}
-                  </dd>
-                </dl>
-              </div>
+        <div className="bg-white border border-gray-200 rounded p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <FaRupeeSign className="h-5 w-5 text-purple-600" />
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm text-gray-600">Total Revenue</p>
+              <p className="text-xl font-semibold text-gray-900">
+                ₹{new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0 }).format(stats.totalRevenue)}
+              </p>
             </div>
           </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <div className="text-sm">
-              <Link href="/admin/reports" className="font-medium text-blue-700 hover:text-blue-900">
-                View reports
-              </Link>
-            </div>
+          <div className="mt-3">
+            <Link href="/admin/reports" className="text-sm text-purple-600 hover:text-purple-800">
+              View reports →
+            </Link>
           </div>
         </div>
 
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
-                <FaUserCog className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Technicians</dt>
-                  <dd className="text-lg font-semibold text-gray-900">{stats.totalTechnicians}</dd>
-                </dl>
-              </div>
+        <div className="bg-white border border-gray-200 rounded p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <FaUserCog className="h-5 w-5 text-orange-600" />
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm text-gray-600">Technicians</p>
+              <p className="text-xl font-semibold text-gray-900">{stats.totalTechnicians}</p>
             </div>
           </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <div className="text-sm">
-              <Link href="/admin/technicians" className="font-medium text-blue-700 hover:text-blue-900">
-                Manage
-              </Link>
-            </div>
+          <div className="mt-3">
+            <Link href="/admin/technicians" className="text-sm text-orange-600 hover:text-orange-800">
+              Manage →
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Quick Links */}
-      <div className="bg-white shadow rounded-lg p-6">
+      {/* Quick Actions */}
+      <div className="bg-white border border-gray-200 rounded p-4">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Link
             href="/admin/bookings"
-            className="inline-block bg-blue-50 hover:bg-blue-100 p-4 rounded-lg text-center transition-colors"
+            className="flex items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
             aria-label="Manage Bookings"
           >
-            <FaCalendarCheck className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-            <span className="text-blue-800 font-medium">Manage Bookings</span>
+            <FaCalendarCheck className="h-4 w-4 text-blue-600 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">Manage Bookings</p>
+              <p className="text-xs text-gray-600">View and manage all bookings</p>
+            </div>
           </Link>
           <Link
             href="/admin/technicians"
-            className="inline-block bg-yellow-50 hover:bg-yellow-100 p-4 rounded-lg text-center transition-colors"
+            className="flex items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
             aria-label="Manage Technicians"
           >
-            <FaUserCog className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
-            <span className="text-yellow-800 font-medium">Manage Technicians</span>
+            <FaUserCog className="h-4 w-4 text-orange-600 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">Manage Technicians</p>
+              <p className="text-xs text-gray-600">Add and manage technicians</p>
+            </div>
           </Link>
           <Link
             href="/admin/reports"
-            className="inline-block bg-purple-50 hover:bg-purple-100 p-4 rounded-lg text-center transition-colors"
+            className="flex items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
             aria-label="View Reports"
           >
-            <FaRupeeSign className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-            <span className="text-purple-800 font-medium">View Reports</span>
+            <FaRupeeSign className="h-4 w-4 text-purple-600 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">View Reports</p>
+              <p className="text-xs text-gray-600">Analytics and insights</p>
+            </div>
           </Link>
         </div>
       </div>

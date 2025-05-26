@@ -26,10 +26,11 @@ export default function TechnicianLayout({
           return;
         }
 
-        // Verify token with server
+        // Verify token with server using cookies
         const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'include', // Include cookies in the request
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         });
@@ -91,8 +92,7 @@ export default function TechnicianLayout({
       <div className="min-h-screen bg-gray-50 flex">
         <TechnicianSidebar />
         <div className="flex-1 md:ml-64 transition-all duration-300">
-          {/* We'll remove the header since we only want one navigation component */}
-          <main className="p-4 md:p-6">{children}</main>
+          <main className="p-8">{children}</main>
         </div>
       </div>
     </TechnicianJobProvider>

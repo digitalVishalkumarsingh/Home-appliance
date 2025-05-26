@@ -31,11 +31,14 @@ export default function FullAdminDashboard() {
       setIsLoading(true);
       setLoadingProgress(10);
 
+      // First check if we have any authentication data
       const token = localStorage.getItem("token");
       const userStr = localStorage.getItem("user");
 
+      // If no localStorage data, immediately redirect to login
       if (!token || !userStr) {
-        throw new Error("No authentication data found. Please log in as admin.");
+        router.push("/admin/login");
+        return;
       }
 
       let user: User;
@@ -44,11 +47,20 @@ export default function FullAdminDashboard() {
         setLoadingProgress(30);
       } catch (parseError) {
         console.error("Error parsing user data:", parseError);
-        throw new Error("Invalid user data. Please log in again.");
+        // Clear invalid data and redirect
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/admin/login");
+        return;
       }
 
+      // Check if user has admin role
       if (user.role !== "admin") {
-        throw new Error("You don't have admin privileges.");
+        // Clear data and redirect
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/admin/login");
+        return;
       }
 
       // Validate token with API - cookies are automatically sent
@@ -60,13 +72,20 @@ export default function FullAdminDashboard() {
       setLoadingProgress(70);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Invalid or expired token.");
+        // Clear invalid authentication data
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/admin/login");
+        return;
       }
 
       const data = await response.json();
       if (!data.success) {
-        throw new Error("Token verification failed.");
+        // Clear invalid authentication data
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/admin/login");
+        return;
       }
 
       setLoadingProgress(100);
@@ -74,9 +93,9 @@ export default function FullAdminDashboard() {
       setIsLoading(false);
     } catch (error) {
       console.error("Error checking admin auth:", error);
-      toast.error(error instanceof Error ? error.message : "An error occurred. Please try again.", {
-        duration: 4000,
-      });
+      // Clear authentication data and redirect
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       router.push("/admin/login");
     }
   }, [router]);

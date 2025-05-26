@@ -1,25 +1,13 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/app/lib/mongodb";
-import { verifyToken } from "@/app/lib/auth-edge";
+import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
 
 // Get admin notifications
 export async function GET(request: Request) {
   try {
-    // Get token from cookies or authorization header
-    const cookieHeader = request.headers.get('Cookie');
-    let token = request.headers.get('authorization')?.split(' ')[1];
-
-    // If no token in authorization header, try to get from cookies
-    if (!token && cookieHeader) {
-      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-        const [key, value] = cookie.trim().split('=');
-        acc[key] = value;
-        return acc;
-      }, {} as Record<string, string>);
-
-      token = cookies.token;
-    }
+    // Verify admin authentication
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json(
@@ -109,20 +97,8 @@ export async function GET(request: Request) {
 // Create a new admin notification
 export async function POST(request: Request) {
   try {
-    // Get token from cookies or authorization header
-    const cookieHeader = request.headers.get('Cookie');
-    let token = request.headers.get('authorization')?.split(' ')[1];
-
-    // If no token in authorization header, try to get from cookies
-    if (!token && cookieHeader) {
-      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-        const [key, value] = cookie.trim().split('=');
-        acc[key] = value;
-        return acc;
-      }, {} as Record<string, string>);
-
-      token = cookies.token;
-    }
+    // Verify admin authentication
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json(

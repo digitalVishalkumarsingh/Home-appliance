@@ -11,27 +11,41 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 
-if (!EMAIL_USER || !EMAIL_PASS || !ADMIN_EMAIL) {
-  logger.error("Missing email configuration", {
+// Check email configuration
+const emailConfigured = !!(EMAIL_USER && EMAIL_PASS && ADMIN_EMAIL);
+if (!emailConfigured) {
+  logger.warn("Email configuration incomplete", {
     hasEmailUser: !!EMAIL_USER,
     hasEmailPass: !!EMAIL_PASS,
     hasAdminEmail: !!ADMIN_EMAIL,
   });
-  throw new Error("EMAIL_USER, EMAIL_PASS, and ADMIN_EMAIL must be set");
+  console.warn("Email sending will be disabled due to missing configuration");
 }
 
-if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-  logger.error("Missing Twilio configuration", {
+// Check Twilio configuration (optional for SMS)
+const twilioConfigured = !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUMBER);
+let twilioClient: ReturnType<typeof twilio> | null = null;
+
+if (twilioConfigured) {
+  try {
+    twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    logger.info("Twilio SMS configured successfully");
+  } catch (error) {
+    logger.error("Failed to initialize Twilio client", { error });
+    console.warn("SMS sending will be disabled due to Twilio configuration error");
+  }
+} else {
+  logger.warn("Twilio configuration incomplete - SMS sending disabled", {
     hasTwilioSid: !!TWILIO_ACCOUNT_SID,
     hasTwilioToken: !!TWILIO_AUTH_TOKEN,
     hasTwilioPhone: !!TWILIO_PHONE_NUMBER,
   });
-  throw new Error("TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER must be set");
 }
 
-const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-
 export const createTransporter = () => {
+  if (!emailConfigured) {
+    throw new Error("Email configuration is incomplete");
+  }
   return nodemailer.createTransport({
     service: process.env.EMAIL_SERVICE || "gmail",
     auth: { user: EMAIL_USER, pass: EMAIL_PASS },
@@ -78,6 +92,11 @@ const createEmailTemplate = (
 
 async function sendSMS(phone: string, message: string): Promise<boolean> {
   try {
+    if (!twilioConfigured || !twilioClient) {
+      logger.warn("SMS sending skipped - Twilio not configured", { phone: "[REDACTED]" });
+      return false;
+    }
+
     await twilioClient.messages.create({
       body: message,
       from: TWILIO_PHONE_NUMBER,
@@ -87,7 +106,7 @@ async function sendSMS(phone: string, message: string): Promise<boolean> {
     return true;
   } catch (error) {
     await logger.error("Failed to send SMS", { error: error instanceof Error ? error.message : "Unknown error", phone: "[REDACTED]" });
-    throw error;
+    return false; // Don't throw error, just return false
   }
 }
 
@@ -130,7 +149,7 @@ export async function sendBookingConfirmationEmail(bookingDetails: {
 }): Promise<boolean> {
   try {
     const transporter = createTransporter();
-    const { customerName, customerEmail, customerAddress, service, amount, bookingDate, bookingTime, paymentId, orderId } = bookingDetails;
+    const { customerEmail, customerAddress, service, amount, bookingDate, bookingTime, paymentId, orderId } = bookingDetails;
     const formattedAmount = formatCurrency(amount);
     let formattedDate = "To be confirmed";
     if (bookingDate) {
@@ -142,7 +161,7 @@ export async function sendBookingConfirmationEmail(bookingDetails: {
           day: "numeric",
         });
         if (bookingTime) formattedDate += ` at ${bookingTime}`;
-      } catch (error) {
+      } catch (_error) {
         await logger.warn("Invalid booking date format", { bookingDate, bookingTime });
         formattedDate = `${bookingDate} ${bookingTime || ""}`;
       }
@@ -196,13 +215,12 @@ export async function sendBookingUpdateEmail(updateDetails: {
 }): Promise<boolean> {
   try {
     const transporter = createTransporter();
-    const { type, customerName, customerEmail, customerPhone, service, bookingDate, bookingTime, oldDate, oldTime, newDate, newTime, reason, bookingId, orderId } = updateDetails;
+    const { type, customerEmail, customerPhone, service, bookingDate, bookingTime, oldDate, oldTime, newDate, newTime, reason, bookingId, orderId } = updateDetails;
 
     let subject = "";
     let title = "";
     let message = "";
     let actionText = "";
-    let actionColor = "";
     let detailsHtml = "";
 
     if (type === "reschedule") {
@@ -210,7 +228,6 @@ export async function sendBookingUpdateEmail(updateDetails: {
       title = "Booking Rescheduled";
       message = `Your booking for <strong>${service}</strong> has been rescheduled as requested.`;
       actionText = "Rescheduled";
-      actionColor = "#3b82f6";
       const formattedOldDate = oldDate ? await formatDate(oldDate) : "Not specified";
       const formattedNewDate = newDate ? await formatDate(newDate) : "Not specified";
       detailsHtml = `
@@ -222,7 +239,6 @@ export async function sendBookingUpdateEmail(updateDetails: {
       title = "Booking Cancelled";
       message = `Your booking for <strong>${service}</strong> has been cancelled as requested.`;
       actionText = "Cancelled";
-      actionColor = "#ef4444";
       const formattedDate = bookingDate ? await formatDate(bookingDate) : "Not specified";
       detailsHtml = `
         <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280;">Booking Date:</td><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: 500;">${formattedDate} ${bookingTime || ""}</td></tr>
@@ -274,7 +290,7 @@ export async function sendBookingReminderEmail(reminderDetails: {
 }): Promise<boolean> {
   try {
     const transporter = createTransporter();
-    const { customerName, customerEmail, customerPhone, service, bookingDate, bookingTime, bookingId, hoursRemaining } = reminderDetails;
+    const { customerEmail, customerPhone, service, bookingDate, bookingTime, bookingId, hoursRemaining } = reminderDetails;
 
     const formattedDate = await formatDate(bookingDate, {
       weekday: "long",
@@ -329,6 +345,13 @@ export async function sendTechnicianCredentialsEmail(technicianDetails: {
   phone: string;
 }): Promise<boolean> {
   try {
+    // Check if email is configured
+    if (!emailConfigured) {
+      await logger.warn("Email sending skipped - email not configured", { email: "[REDACTED]" });
+      console.log("Email configuration missing, skipping technician credentials email");
+      return false;
+    }
+
     const transporter = createTransporter();
     const { name, email, resetToken, phone } = technicianDetails;
     const loginUrl = `${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "https://dizitsolutions.com"}/reset-password?token=${resetToken}`;
@@ -355,17 +378,22 @@ export async function sendTechnicianCredentialsEmail(technicianDetails: {
     const info = await transporter.sendMail(mailOptions);
     await logger.info("Technician credentials email sent", { email: "[REDACTED]", messageId: info.messageId });
 
+    // Try to send SMS (optional)
     if (phone) {
-      await sendSMS(
-        phone,
-        `Welcome to Dizit Solutions, ${name}! Set your password at ${loginUrl}.`
-      );
+      try {
+        await sendSMS(
+          phone,
+          `Welcome to Dizit Solutions, ${name}! Set your password at ${loginUrl}.`
+        );
+      } catch (smsError) {
+        logger.warn("SMS sending failed but continuing", { error: smsError });
+      }
     }
 
     return info.accepted.length > 0;
   } catch (error) {
-    await logger.error("Failed to send technician credentials email or SMS", { error: error instanceof Error ? error.message : "Unknown error", email: "[REDACTED]" });
-    throw error;
+    await logger.error("Failed to send technician credentials email", { error: error instanceof Error ? error.message : "Unknown error", email: "[REDACTED]" });
+    return false; // Don't throw error, just return false
   }
 }
 
@@ -389,7 +417,7 @@ export async function sendAdminBookingNotificationEmail(bookingDetails: {
     }
 
     const transporter = createTransporter();
-    const { customerName, customerEmail, customerPhone, customerAddress, service, amount, bookingDate, bookingTime, paymentId, orderId } = bookingDetails;
+    const { customerName, customerAddress, service, amount, bookingDate, bookingTime, paymentId, orderId } = bookingDetails;
 
     const formattedAmount = formatCurrency(amount);
     const formattedDate = bookingDate ? await formatDate(bookingDate) : "Not specified";

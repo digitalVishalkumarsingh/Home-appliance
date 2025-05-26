@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-import { Toaster } from 'react-hot-toast';
+import { ToastProvider } from './components/ui/Toast';
 import OfferNotificationsClient from "./components/OfferNotificationsClient";
 import NewUserWelcome from "./components/NewUserWelcome";
 import FirstTimeBookingNotification from "./components/FirstTimeBookingNotification";
@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dizit Solutions - Professional Appliance Repair Services",
-  description: "Dizit Solutions offers professional repair services for AC, washing machines, and other home appliances. Book our expert technicians today.",
+  title: "Dizit Solutions - 24/7 Professional Appliance Repair Services",
+  description: "Dizit Solutions offers 24/7 professional repair services for AC, washing machines, and other home appliances. Book our expert technicians anytime, 7 days a week.",
 };
 
 export default function RootLayout({
@@ -34,13 +34,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Toaster position="top-center" />
-        <MainLayout>
-          {children}
-        </MainLayout>
-        <OfferNotificationsClient />
-        <NewUserWelcome />
-        <FirstTimeBookingNotification />
+        <ToastProvider>
+          <MainLayout>
+            {children}
+          </MainLayout>
+          <OfferNotificationsClient />
+          <NewUserWelcome />
+          <FirstTimeBookingNotification />
+        </ToastProvider>
       </body>
     </html>
   );

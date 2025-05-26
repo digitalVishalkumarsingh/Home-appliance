@@ -7,7 +7,7 @@ import { ObjectId } from "mongodb";
 export async function GET(request: Request) {
   try {
     // Verify technician authentication
-    const token = getTokenFromRequest(new NextRequest(request));
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json(
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || typeof decoded !== "object" || !("userId" in decoded)) {
       return NextResponse.json(
@@ -127,6 +127,7 @@ export async function GET(request: Request) {
         address: booking.customerAddress || booking.address || "Customer Address",
         fullAddress: booking.customerAddress || booking.address || "Customer Address",
         distance: pendingJobOffer.distance || 5, // Default to 5km if not specified
+        coordinates: booking.customerLocation || pendingJobOffer.customerLocation || null,
       },
       earnings: {
         total: pendingJobOffer.amount || totalAmount,

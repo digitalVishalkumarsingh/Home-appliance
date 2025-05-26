@@ -9,11 +9,9 @@ import {
   FaCheck,
   FaStar,
   FaSearch,
-  FaFilter,
   FaExclamationTriangle,
   FaPhone,
   FaEnvelope,
-  FaMapMarkerAlt,
 } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 
@@ -60,19 +58,19 @@ export default function TechnicianAssignmentModal({
   useEffect(() => {
     // Filter technicians based on search term and status filter
     let filtered = [...technicians];
-    
+
     if (searchTerm) {
-      filtered = filtered.filter(tech => 
+      filtered = filtered.filter(tech =>
         tech.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         tech.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         tech.phone.includes(searchTerm)
       );
     }
-    
+
     if (statusFilter !== "all") {
       filtered = filtered.filter(tech => tech.status === statusFilter);
     }
-    
+
     setFilteredTechnicians(filtered);
   }, [technicians, searchTerm, statusFilter]);
 
@@ -80,7 +78,7 @@ export default function TechnicianAssignmentModal({
     try {
       setLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         setError("Authentication token not found");
@@ -98,7 +96,7 @@ export default function TechnicianAssignmentModal({
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setTechnicians(data.technicians);
         setFilteredTechnicians(data.technicians);
@@ -108,43 +106,6 @@ export default function TechnicianAssignmentModal({
     } catch (error: any) {
       console.error("Error fetching technicians:", error);
       setError(error.message || "Failed to load technicians. Please try again.");
-      
-      // For demo purposes, set mock data if API fails
-      const mockTechnicians = [
-        {
-          _id: "1",
-          name: "Rajesh Kumar",
-          email: "rajesh@example.com",
-          phone: "9876543210",
-          specializations: ["AC Repair", "Refrigerator"],
-          status: "online",
-          rating: 4.8,
-          completedBookings: 45
-        },
-        {
-          _id: "2",
-          name: "Sunil Verma",
-          email: "sunil@example.com",
-          phone: "8765432109",
-          specializations: ["Washing Machine", "Microwave"],
-          status: "active",
-          rating: 4.5,
-          completedBookings: 32
-        },
-        {
-          _id: "3",
-          name: "Amit Singh",
-          email: "amit@example.com",
-          phone: "7654321098",
-          specializations: ["AC Repair", "TV Repair"],
-          status: "online",
-          rating: 4.2,
-          completedBookings: 28
-        }
-      ];
-      
-      setTechnicians(mockTechnicians);
-      setFilteredTechnicians(mockTechnicians);
     } finally {
       setLoading(false);
     }
@@ -153,7 +114,7 @@ export default function TechnicianAssignmentModal({
   const handleAssignTechnician = async (technicianId: string) => {
     try {
       setAssigningTechnicianId(technicianId);
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Authentication token not found");
@@ -178,7 +139,7 @@ export default function TechnicianAssignmentModal({
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success("Technician assigned successfully");
         onAssignSuccess();
@@ -216,7 +177,7 @@ export default function TechnicianAssignmentModal({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             className="fixed inset-0 z-50 overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <div className="flex items-center justify-center min-h-screen p-4">
               <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl overflow-hidden">

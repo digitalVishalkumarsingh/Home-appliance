@@ -56,10 +56,9 @@ export default function CreatedBookingsPage() {
           throw new Error("Authentication token not found. Please log in again.");
         }
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/bookings?status=pending`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const response = await fetch(`/api/admin/bookings?status=pending`, {
+          method: 'GET',
+          credentials: 'include', // Include cookies in the request
         });
 
         if (!response.ok) {
@@ -517,8 +516,9 @@ export default function CreatedBookingsPage() {
             setLoading(true);
             const token = localStorage.getItem("token");
             if (token) {
-              fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/bookings?status=pending`, {
-                headers: { Authorization: `Bearer ${token}` },
+              fetch(`/api/admin/bookings?status=pending`, {
+                method: 'GET',
+                credentials: 'include', // Include cookies in the request
               })
                 .then((response) => response.json())
                 .then((data) => {

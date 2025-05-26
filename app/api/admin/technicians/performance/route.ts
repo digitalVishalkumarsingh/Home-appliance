@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     // Calculate date range based on timeRange
     const now = new Date();
     let startDate = new Date();
-    
+
     if (timeRange === "week") {
       startDate.setDate(now.getDate() - 7);
     } else if (timeRange === "month") {
@@ -59,32 +59,32 @@ export async function GET(request: Request) {
         const completedBookings = bookings.filter(b => b.status === "completed").length;
         const pendingBookings = bookings.filter(b => b.status === "pending" || b.status === "confirmed" || b.status === "assigned").length;
         const cancelledBookings = bookings.filter(b => b.status === "cancelled").length;
-        
+
         // Calculate total earnings
         const totalEarnings = bookings
           .filter(b => b.status === "completed")
           .reduce((sum, booking) => sum + (booking.finalAmount || booking.amount || 0), 0);
-        
+
         // Calculate average completion time (if available)
         let averageCompletionTime = 0;
         const bookingsWithCompletionTime = bookings.filter(
           b => b.status === "completed" && b.assignedAt && b.completedAt
         );
-        
+
         if (bookingsWithCompletionTime.length > 0) {
           const totalCompletionTime = bookingsWithCompletionTime.reduce((sum, booking) => {
             const assignedTime = new Date(booking.assignedAt).getTime();
             const completedTime = new Date(booking.completedAt).getTime();
             return sum + (completedTime - assignedTime) / (1000 * 60); // Convert to minutes
           }, 0);
-          
+
           averageCompletionTime = Math.round(totalCompletionTime / bookingsWithCompletionTime.length);
         }
-        
+
         // Calculate customer satisfaction (based on ratings if available)
         let customerSatisfaction = 0;
         const bookingsWithRatings = bookings.filter(b => b.customerRating);
-        
+
         if (bookingsWithRatings.length > 0) {
           const totalRating = bookingsWithRatings.reduce((sum, booking) => sum + (booking.customerRating || 0), 0);
           const averageRating = totalRating / bookingsWithRatings.length;
@@ -93,19 +93,19 @@ export async function GET(request: Request) {
           // If no ratings, use technician's overall rating
           customerSatisfaction = Math.round(((technician.rating || 0) / 5) * 100);
         }
-        
+
         // Calculate response rate
         let responseRate = 0;
         const assignedBookings = bookings.filter(b => b.assignedAt);
-        
+
         if (assignedBookings.length > 0) {
           const respondedBookings = assignedBookings.filter(
             b => b.technicianAcceptedAt || b.technicianRejectedAt
           );
-          
+
           responseRate = Math.round((respondedBookings.length / assignedBookings.length) * 100);
         }
-        
+
         return {
           _id: technician._id,
           name: technician.name,

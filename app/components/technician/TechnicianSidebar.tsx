@@ -16,7 +16,7 @@ import {
 } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import useAuth  from "../../hooks/useAuth";
-import AvailabilityToggle from "./AvailabilityToggle";
+// Removed AvailabilityToggle - now only in dashboard
 import NotificationBadge from "./NotificationBadge";
 import { logger } from "../../config/logger";
 
@@ -93,16 +93,16 @@ export default function TechnicianSidebar() {
 
   if (authLoading) {
     return (
-      <div className="md:w-64 bg-gradient-to-b from-blue-800 to-indigo-900 text-white h-screen fixed left-0 top-0 shadow-xl z-40">
-        <div className="p-4 border-b border-blue-700">
+      <div className="md:w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-sm z-40">
+        <div className="p-4 border-b border-gray-200">
           <div className="flex items-center space-x-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-gray-400 animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse" />
             <div className="space-y-2">
-              <div className="h-4 w-24 bg-gray-400 rounded animate-pulse" />
-              <div className="h-3 w-16 bg-gray-400 rounded animate-pulse" />
+              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+              <div className="h-3 w-16 bg-gray-200 rounded animate-pulse" />
             </div>
           </div>
-          <div className="h-10 bg-gray-400 rounded-full animate-pulse" />
+          <div className="h-10 bg-gray-200 rounded-full animate-pulse" />
         </div>
       </div>
     );
@@ -148,62 +148,65 @@ export default function TechnicianSidebar() {
 
       {/* Sidebar */}
       <div
-        className={`w-64 bg-gradient-to-b from-blue-800 to-indigo-900 text-white h-screen fixed left-0 top-0 shadow-xl z-40 transition-transform duration-300 ease-in-out ${
+        className={`w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-sm z-40 transition-transform duration-300 ease-in-out ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
         role="navigation"
         aria-label="Technician sidebar"
       >
+        {/* Header */}
+        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+          <Link href="/technician/dashboard" className="flex items-center">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">T</span>
+            </div>
+            <span className="ml-3 text-lg font-semibold text-gray-900">Technician</span>
+          </Link>
+        </div>
+
         {/* User Profile Summary */}
-        <div className="p-4 border-b border-blue-700">
+        <div className="p-4 border-b border-gray-200">
           <div className="flex items-center space-x-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md border-2 border-white/30">
-              <FaUser className="h-4 w-4 text-white" />
+            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+              <FaUser className="h-5 w-5 text-gray-500" />
             </div>
             <div>
-              <p className="font-medium text-sm">{user.name || user.email}</p>
-              <p className="text-xs text-blue-300">Technician</p>
+              <p className="font-medium text-sm text-gray-900">{user.name || user.email}</p>
+              <p className="text-xs text-gray-500">Technician</p>
             </div>
           </div>
-          <div className="mt-2">
-            <AvailabilityToggle />
-          </div>
           <div className="mt-3 flex items-center justify-between">
-            <Link
-              href="/technician/notifications"
-              className="flex items-center text-blue-200 hover:text-white"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
+            <div className="flex items-center text-gray-600 hover:text-gray-900 transition-colors">
               <div className="relative mr-2">
                 <NotificationBadge />
               </div>
               <span className="text-sm">Notifications</span>
-            </Link>
+            </div>
           </div>
         </div>
 
         {/* Navigation Links */}
-        <nav className="mt-4 px-2">
-          <ul className="space-y-1">
+        <nav className="flex-1 overflow-y-auto py-2">
+          <ul className="px-3 space-y-1">
             {links.map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 ${
                     isActive(link.href)
-                      ? "bg-indigo-700 text-white"
-                      : "text-blue-100 hover:bg-blue-700/50"
+                      ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                   }`}
                   aria-current={isActive(link.href) ? "page" : undefined}
                 >
-                  <span className={isActive(link.href) ? "text-white" : "text-blue-300"}>
+                  <span className={isActive(link.href) ? "text-blue-600" : "text-gray-400"}>
                     {link.icon}
                   </span>
-                  <span>{link.label}</span>
+                  <span className="font-medium">{link.label}</span>
                   {isActive(link.href) && (
                     <span
-                      className="ml-auto w-1.5 h-1.5 rounded-full bg-white"
+                      className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600"
                       aria-hidden="true"
                     />
                   )}
@@ -214,13 +217,13 @@ export default function TechnicianSidebar() {
         </nav>
 
         {/* Logout Button */}
-        <div className="absolute bottom-8 w-full px-4">
+        <div className="p-4 border-t border-gray-200">
           <button
             onClick={handleLogout}
-            className="flex items-center space-x-3 w-full px-4 py-2.5 text-blue-200 hover:bg-red-600/20 hover:text-white rounded-lg transition-colors"
+            className="flex items-center space-x-3 w-full px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
           >
-            <FaSignOutAlt className="w-5 h-5" />
-            <span>Logout</span>
+            <FaSignOutAlt className="w-4 h-4 text-gray-400" />
+            <span className="font-medium">Logout</span>
           </button>
         </div>
       </div>

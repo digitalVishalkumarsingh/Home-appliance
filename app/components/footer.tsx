@@ -28,7 +28,7 @@ const Footer = () => {
               className="bg-blue-600 text-white py-2 px-6 rounded-full mt-2 hover:bg-orange-600 transition duration-300 w-full max-w-xs text-center"
               onClick={() => window.location.href = "tel:7324802379"}
             >
-              Book Now @ 7324802379
+              Book Now @ 7324802379 (24/7)
             </motion.button>
           </div>
 
@@ -198,7 +198,7 @@ const Footer = () => {
           <div>
             <h3 className="text-xl font-semibold mb-4">Contact Us</h3>
             <p className="mb-2">
-              <strong>Phone No.</strong>: 07324802379
+              <strong>Phone No.</strong>: 07324802379 (24/7 Service)
             </p>
             <p className="mb-2">
               <strong>Email</strong>:{" "}

@@ -41,8 +41,9 @@ export default function AdminProfilePage() {
       }
 
       setLoadingProgress(50);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/admin/verify`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await fetch(`/api/admin/verify`, {
+        method: 'GET',
+        credentials: 'include', // Include cookies in the request
       });
 
       if (!response.ok) {

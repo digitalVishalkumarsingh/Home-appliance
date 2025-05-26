@@ -38,8 +38,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showRazorpay, setShowRazorpay] = useState(false);
-  const [orderData, setOrderData] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online' | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Extract numeric price from string (e.g., "₹499.1 onwards" -> 499.1)
   // Use parseFloat to preserve decimal values

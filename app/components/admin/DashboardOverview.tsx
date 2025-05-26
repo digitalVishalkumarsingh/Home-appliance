@@ -1,20 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { toast } from "react-hot-toast";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { toast } from "../ui/Toast";
 import {
-  FaCalendarCheck,
-  FaUsers,
   FaTools,
   FaRupeeSign,
+  FaCalendarCheck,
+  FaUsers,
   FaArrowUp,
   FaArrowDown,
-  FaSpinner,
-  FaUserCog,
-  FaWrench,
+  FaUserCog
 } from "react-icons/fa";
-import Link from "next/link";
+import { motion } from "framer-motion";
+
+// Custom icons for refresh and spinner
+const RefreshIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+const SpinnerIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
 
 interface DashboardStats {
   totalBookings: number;
@@ -31,7 +43,7 @@ interface DashboardStats {
   avgTechnicianRating: number;
 }
 
-export default function DashboardOverview() {
+const DashboardOverview: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalBookings: 0,
     pendingBookings: 0,
@@ -46,38 +58,34 @@ export default function DashboardOverview() {
     techniciansChange: 0,
     avgTechnicianRating: 0,
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     fetchDashboardStats();
   }, []);
 
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = async (): Promise<void> => {
     try {
       setLoading(true);
 
-      // Check if we're in the browser environment
-      if (typeof window === 'undefined') {
+      if (typeof window === "undefined") {
         console.warn("Not in browser environment, using mock data");
         setMockData();
         return;
       }
 
-      // Set a timeout to ensure we don't wait too long
-      const timeoutPromise = new Promise((_, reject) =>
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("Request timeout")), 5000)
       );
 
-      // Get token with fallback
-      let token;
+      let token: string | null = null;
       try {
         token = localStorage.getItem("token");
         if (!token) {
-          // Try to get from cookie as fallback
           token = document.cookie
-            .split(';')
-            .find(c => c.trim().startsWith('token='))
-            ?.split('=')[1];
+            .split(";")
+            .find((c) => c.trim().startsWith("token="))
+            ?.split("=")[1] || null;
         }
       } catch (tokenError) {
         console.error("Error getting token:", tokenError);
@@ -89,16 +97,18 @@ export default function DashboardOverview() {
         return;
       }
 
-      // Fetch stats from the API with timeout
       try {
-        const fetchPromise = fetch("/api/admin/stats", {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "/api";
+        const fetchPromise = fetch(`${apiUrl}/admin/stats`, {
+          method: "GET",
+          credentials: "include",
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
         });
 
-        // Race between fetch and timeout
-        const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+        const response = (await Promise.race([fetchPromise, timeoutPromise])) as Response;
 
         if (!response.ok) {
           let errorMessage = "Failed to fetch dashboard stats";
@@ -116,20 +126,19 @@ export default function DashboardOverview() {
         console.log("Dashboard stats fetched successfully:", data);
 
         if (data.success) {
-          // Update state with real data from API
           setStats({
-            totalBookings: data.totalBookings || 0,
-            pendingBookings: data.pendingBookings || 0,
-            completedBookings: data.completedBookings || 0,
-            totalCustomers: data.totalCustomers || 0,
-            totalRevenue: data.totalRevenue || 0,
-            revenueChange: data.revenueChange || 0,
-            bookingsChange: data.bookingsChange || 0,
-            customersChange: data.customersChange || 0,
-            totalTechnicians: data.totalTechnicians || 0,
-            activeTechnicians: data.activeTechnicians || 0,
-            techniciansChange: data.techniciansChange || 0,
-            avgTechnicianRating: data.avgTechnicianRating || 0,
+            totalBookings: data.totalBookings ?? 0,
+            pendingBookings: data.pendingBookings ?? 0,
+            completedBookings: data.completedBookings ?? 0,
+            totalCustomers: data.totalCustomers ?? 0,
+            totalRevenue: data.totalRevenue ?? 0,
+            revenueChange: data.revenueChange ?? 0,
+            bookingsChange: data.bookingsChange ?? 0,
+            customersChange: data.customersChange ?? 0,
+            totalTechnicians: data.totalTechnicians ?? 0,
+            activeTechnicians: data.activeTechnicians ?? 0,
+            techniciansChange: data.techniciansChange ?? 0,
+            avgTechnicianRating: data.avgTechnicianRating ?? 0,
           });
         } else {
           throw new Error(data.message || "Failed to fetch dashboard stats");
@@ -146,9 +155,7 @@ export default function DashboardOverview() {
     }
   };
 
-  // Helper function to use mock data
-  const setMockData = () => {
-    // Use mock data for demonstration
+  const setMockData = (): void => {
     setStats({
       totalBookings: 156,
       pendingBookings: 23,
@@ -164,13 +171,9 @@ export default function DashboardOverview() {
       avgTechnicianRating: 4.5,
     });
 
-    // Show toast notification about using mock data
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
-        toast?.info("Using demo data for dashboard", {
-          duration: 3000,
-          position: "bottom-right"
-        });
+        toast.info("Using demo data for dashboard");
       } catch (toastError) {
         console.warn("Could not show toast notification:", toastError);
       }
@@ -209,28 +212,24 @@ export default function DashboardOverview() {
         >
           {loading ? (
             <>
-              <FaSpinner className="animate-spin h-4 w-4 mr-2" />
+              <SpinnerIcon className="h-4 w-4 mr-2 animate-spin" />
               Refreshing...
             </>
           ) : (
             <>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+              <RefreshIcon className="h-4 w-4 mr-2" />
               Refresh Stats
             </>
           )}
         </button>
       </div>
 
-      {/* Featured Stats Row */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 mb-6">
-        {/* Pending Bookings Card - Featured */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className={`${stats.pendingBookings > 0 ? 'bg-yellow-50 border-yellow-300' : 'bg-white border-gray-200'} overflow-hidden shadow-lg rounded-lg border hover:shadow-xl transition-shadow duration-300`}
+          className={`${stats.pendingBookings > 0 ? "bg-yellow-50 border-yellow-300" : "bg-white border-gray-200"} overflow-hidden shadow-lg rounded-lg border hover:shadow-xl transition-shadow duration-300`}
         >
           <div className="p-6">
             <div className="flex items-center">
@@ -239,9 +238,7 @@ export default function DashboardOverview() {
               </div>
               <div className="ml-6 w-0 flex-1">
                 <dl>
-                  <dt className="text-lg font-medium text-gray-700 truncate">
-                    Pending Bookings
-                  </dt>
+                  <dt className="text-lg font-medium text-gray-700 truncate">Pending Bookings</dt>
                   <dd className="flex items-center mt-2">
                     <div className="text-4xl font-bold text-gray-900">
                       {stats.pendingBookings.toLocaleString()}
@@ -254,23 +251,29 @@ export default function DashboardOverview() {
                   </dd>
                   <dd className="mt-3 text-sm text-gray-600 font-medium">
                     {stats.pendingBookings === 0
-                      ? 'No pending bookings to process'
+                      ? "No pending bookings to process"
                       : stats.pendingBookings === 1
-                        ? '1 booking requires your attention'
+                        ? "1 booking requires your attention"
                         : `${stats.pendingBookings} bookings require your attention`}
                   </dd>
                 </dl>
               </div>
             </div>
           </div>
-          <div className={`${stats.pendingBookings > 0 ? 'bg-yellow-100' : 'bg-gray-50'} px-6 py-4 border-t ${stats.pendingBookings > 0 ? 'border-yellow-200' : 'border-gray-200'}`}>
+          <div className={`${stats.pendingBookings > 0 ? "bg-yellow-100 border-yellow-200" : "bg-gray-50 border-gray-200"} px-6 py-4 border-t`}>
             <div className="text-sm flex justify-between items-center">
               <Link
                 href="/admin/bookings?status=pending"
-                className={`font-medium ${stats.pendingBookings > 0 ? 'text-amber-600 hover:text-amber-700' : 'text-blue-600 hover:text-blue-500'} flex items-center`}
+                className={`font-medium ${stats.pendingBookings > 0 ? "text-amber-600 hover:text-amber-700" : "text-blue-600 hover:text-blue-500"} flex items-center`}
               >
                 View pending bookings
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 ml-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
@@ -279,7 +282,6 @@ export default function DashboardOverview() {
           </div>
         </motion.div>
 
-        {/* Total Revenue Card - Featured */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -293,32 +295,22 @@ export default function DashboardOverview() {
               </div>
               <div className="ml-6 w-0 flex-1">
                 <dl>
-                  <dt className="text-lg font-medium text-gray-700 truncate">
-                    Total Revenue
-                  </dt>
+                  <dt className="text-lg font-medium text-gray-700 truncate">Total Revenue</dt>
                   <dd className="flex items-center mt-2">
                     <div className="text-4xl font-bold text-indigo-900">
                       ₹{stats.totalRevenue.toLocaleString()}
                     </div>
                     <div
-                      className={`ml-3 flex items-center text-sm ${
-                        stats.revenueChange >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
+                      className={`ml-3 flex items-center text-sm ${stats.revenueChange >= 0 ? "text-green-600" : "text-red-600"}`}
                     >
-                      {stats.revenueChange >= 0 ? (
-                        <FaArrowUp className="h-4 w-4 mr-1" />
-                      ) : (
-                        <FaArrowDown className="h-4 w-4 mr-1" />
-                      )}
+                      {stats.revenueChange >= 0 ? <FaArrowUp className="h-4 w-4 mr-1" /> : <FaArrowDown className="h-4 w-4 mr-1" />}
                       {Math.abs(stats.revenueChange).toFixed(1)}%
                     </div>
                   </dd>
                   <dd className="mt-3 text-sm text-gray-600 font-medium">
                     {stats.revenueChange >= 0
-                      ? 'Revenue is growing compared to last month'
-                      : 'Revenue has decreased compared to last month'}
+                      ? "Revenue is growing compared to last month"
+                      : "Revenue has decreased compared to last month"}
                   </dd>
                 </dl>
               </div>
@@ -331,7 +323,13 @@ export default function DashboardOverview() {
                 className="font-medium text-indigo-700 hover:text-indigo-800 flex items-center"
               >
                 View financial reports
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 ml-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
@@ -341,9 +339,7 @@ export default function DashboardOverview() {
         </motion.div>
       </div>
 
-      {/* Secondary Stats Row */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Total Bookings Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -357,32 +353,20 @@ export default function DashboardOverview() {
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Bookings
-                  </dt>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Total Bookings</dt>
                   <dd className="flex items-center">
                     <div className="text-2xl font-bold text-gray-900">
                       {stats.totalBookings.toLocaleString()}
                     </div>
                     <div
-                      className={`ml-2 flex items-center text-sm ${
-                        stats.bookingsChange >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
+                      className={`ml-2 flex items-center text-sm ${stats.bookingsChange >= 0 ? "text-green-600" : "text-red-600"}`}
                     >
-                      {stats.bookingsChange >= 0 ? (
-                        <FaArrowUp className="h-3 w-3 mr-1" />
-                      ) : (
-                        <FaArrowDown className="h-3 w-3 mr-1" />
-                      )}
+                      {stats.bookingsChange >= 0 ? <FaArrowUp className="h-3 w-3 mr-1" /> : <FaArrowDown className="h-3 w-3 mr-1" />}
                       {Math.abs(stats.bookingsChange).toFixed(1)}%
                     </div>
                   </dd>
                   <dd className="mt-1 text-sm text-gray-500">
-                    {stats.bookingsChange >= 0
-                      ? 'Bookings are increasing'
-                      : 'Bookings have decreased'} compared to last month
+                    {stats.bookingsChange >= 0 ? "Bookings are increasing" : "Bookings have decreased"} compared to last month
                   </dd>
                 </dl>
               </div>
@@ -395,7 +379,13 @@ export default function DashboardOverview() {
                 className="font-medium text-blue-600 hover:text-blue-500 flex items-center"
               >
                 View all bookings
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 ml-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
@@ -404,7 +394,6 @@ export default function DashboardOverview() {
           </div>
         </motion.div>
 
-        {/* Total Customers Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -418,30 +407,20 @@ export default function DashboardOverview() {
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Customers
-                  </dt>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Total Customers</dt>
                   <dd className="flex items-center">
                     <div className="text-2xl font-bold text-gray-900">
                       {stats.totalCustomers.toLocaleString()}
                     </div>
                     <div
-                      className={`ml-2 flex items-center text-sm ${
-                        stats.customersChange >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
+                      className={`ml-2 flex items-center text-sm ${stats.customersChange >= 0 ? "text-green-600" : "text-red-600"}`}
                     >
-                      {stats.customersChange >= 0 ? (
-                        <FaArrowUp className="h-3 w-3 mr-1" />
-                      ) : (
-                        <FaArrowDown className="h-3 w-3 mr-1" />
-                      )}
+                      {stats.customersChange >= 0 ? <FaArrowUp className="h-3 w-3 mr-1" /> : <FaArrowDown className="h-3 w-3 mr-1" />}
                       {Math.abs(stats.customersChange).toFixed(1)}%
                     </div>
                   </dd>
                   <dd className="mt-1 text-sm text-gray-500">
-                    {stats.customersChange >= 0 ? 'Growing' : 'Declining'} compared to last month
+                    {stats.customersChange >= 0 ? "Growing" : "Declining"} compared to last month
                   </dd>
                 </dl>
               </div>
@@ -454,7 +433,13 @@ export default function DashboardOverview() {
                 className="font-medium text-blue-600 hover:text-blue-500 flex items-center"
               >
                 View all customers
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 ml-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
@@ -463,7 +448,6 @@ export default function DashboardOverview() {
           </div>
         </motion.div>
 
-        {/* Technicians Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -477,31 +461,21 @@ export default function DashboardOverview() {
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Technicians
-                  </dt>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Technicians</dt>
                   <dd className="flex items-center">
                     <div className="text-2xl font-bold text-gray-900">
                       {stats.totalTechnicians.toLocaleString()}
                     </div>
                     <div
-                      className={`ml-2 flex items-center text-sm ${
-                        stats.techniciansChange >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
+                      className={`ml-2 flex items-center text-sm ${stats.techniciansChange >= 0 ? "text-green-600" : "text-red-600"}`}
                     >
-                      {stats.techniciansChange >= 0 ? (
-                        <FaArrowUp className="h-3 w-3 mr-1" />
-                      ) : (
-                        <FaArrowDown className="h-3 w-3 mr-1" />
-                      )}
+                      {stats.techniciansChange >= 0 ? <FaArrowUp className="h-3 w-3 mr-1" /> : <FaArrowDown className="h-3 w-3 mr-1" />}
                       {Math.abs(stats.techniciansChange).toFixed(1)}%
                     </div>
                   </dd>
                   <dd className="mt-1 text-sm text-gray-500">
-                    <span className="font-medium">{stats.activeTechnicians}</span> active technicians,
-                    <span className="ml-1 font-medium">{stats.avgTechnicianRating.toFixed(1)}</span> avg. rating
+                    <span className="font-medium">{stats.activeTechnicians}</span> active technicians,{" "}
+                    <span className="font-medium">{stats.avgTechnicianRating.toFixed(1)}</span> avg. rating
                   </dd>
                 </dl>
               </div>
@@ -514,7 +488,13 @@ export default function DashboardOverview() {
                 className="font-medium text-blue-600 hover:text-blue-500 flex items-center"
               >
                 Manage technicians
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 ml-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
@@ -525,4 +505,7 @@ export default function DashboardOverview() {
       </div>
     </div>
   );
-}
+};
+
+export default DashboardOverview;
+

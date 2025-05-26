@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaCalendarCheck, FaTimes } from 'react-icons/fa';
-import Link from 'next/link';
+// Removed unused Link import
 import { useRouter } from 'next/navigation';
 
 interface Notification {
@@ -44,7 +44,7 @@ export default function BookingNotification() {
     }
   }, []);
 
-  // Fetch recent booking notifications
+  // Fetch recent booking notifications with fallback support
   const fetchBookingNotifications = async () => {
     try {
       // Don't fetch notifications for technicians and admins
@@ -53,14 +53,26 @@ export default function BookingNotification() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('/api/user/notifications?limit=5&unreadOnly=true', {
+      // Try main endpoint first
+      let response = await fetch('/api/user/notifications?limit=5&unreadOnly=true', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
+      // If main endpoint fails, try fallback
       if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
+        console.log('Main notifications endpoint failed for booking notifications, trying fallback...');
+
+        try {
+          response = await fetch('/api/notifications/fallback?limit=5&unreadOnly=true');
+          if (!response.ok) {
+            throw new Error('Both main and fallback endpoints failed');
+          }
+        } catch (fallbackError) {
+          console.error('Fallback booking notifications failed:', fallbackError);
+          return; // Silently fail
+        }
       }
 
       const data = await response.json();

@@ -7,7 +7,7 @@ import { ObjectId } from "mongodb";
 export async function POST(request: Request) {
   try {
     // Verify technician authentication
-    const token = getTokenFromRequest(new NextRequest(request));
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json(
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || typeof decoded !== "object" || !("userId" in decoded)) {
       return NextResponse.json(
@@ -89,8 +89,8 @@ export async function POST(request: Request) {
     // Update booking as completed
     await db.collection("bookings").updateOne(
       { _id: booking._id },
-      { 
-        $set: { 
+      {
+        $set: {
           status: "completed",
           completedAt: new Date(),
           completedBy: technician.name,
@@ -100,15 +100,15 @@ export async function POST(request: Request) {
           additionalCharges: additionalCharges || [],
           finalAmount: totalAmount,
           updatedAt: new Date()
-        } 
+        }
       }
     );
 
     // Update technician status and stats
     await db.collection("technicians").updateOne(
       { _id: technician._id },
-      { 
-        $set: { 
+      {
+        $set: {
           status: "active",
           updatedAt: new Date()
         },

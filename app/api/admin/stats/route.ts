@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -158,18 +158,20 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      totalBookings,
-      pendingBookings,
-      completedBookings,
-      totalCustomers,
-      totalRevenue,
-      revenueChange: parseFloat(revenueChange.toFixed(1)),
-      bookingsChange: parseFloat(bookingsChange.toFixed(1)),
-      customersChange: parseFloat(customersChange.toFixed(1)),
-      totalTechnicians,
-      activeTechnicians,
-      techniciansChange: parseFloat(techniciansChange.toFixed(1)),
-      avgTechnicianRating,
+      stats: {
+        totalBookings,
+        pendingBookings,
+        completedBookings,
+        totalCustomers,
+        totalRevenue,
+        revenueChange: parseFloat(revenueChange.toFixed(1)),
+        bookingsChange: parseFloat(bookingsChange.toFixed(1)),
+        customersChange: parseFloat(customersChange.toFixed(1)),
+        totalTechnicians,
+        activeTechnicians,
+        techniciansChange: parseFloat(techniciansChange.toFixed(1)),
+        avgTechnicianRating,
+      }
     });
   } catch (error) {
     console.error("Error fetching stats:", error);

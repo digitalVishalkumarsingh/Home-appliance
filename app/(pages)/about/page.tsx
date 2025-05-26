@@ -57,9 +57,9 @@ const About = () => {
           transition={{ duration: 1.2, delay: 0.9 }}
         >
           {[
-            { title: "AC Repair", desc: "Expert AC repair services for all types of air conditioners." },
-            { title: "Refrigerator Repair", desc: "Efficient refrigerator repair solutions to keep your food fresh." },
-            { title: "Washing Machine Repair", desc: "Prompt washing machine repair services for all brands." },
+            { title: "AC Repair", desc: "Expert AC repair services available 24/7 for all types of air conditioners." },
+            { title: "Refrigerator Repair", desc: "24/7 refrigerator repair solutions to keep your food fresh." },
+            { title: "Washing Machine Repair", desc: "Round-the-clock washing machine repair services for all brands." },
           ].map((service: Service, index: number) => (
             <div
               key={index}

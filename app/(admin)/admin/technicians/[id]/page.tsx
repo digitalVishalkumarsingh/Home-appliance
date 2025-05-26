@@ -277,8 +277,15 @@ export default function TechnicianDetailsPage() {
       console.log("Resend password response:", data);
 
       if (data.success) {
-        // Check if debug info with password is available
-        if (data.debug && data.debug.password) {
+        // Check if temporary password is available
+        if (data.temporaryPassword) {
+          setPasswordInfo({
+            password: data.temporaryPassword,
+            email: technician.email
+          });
+
+          toast.success("Password reset successfully. See below for login credentials.");
+        } else if (data.debug && data.debug.password) {
           setPasswordInfo({
             password: data.debug.password,
             email: technician.email
@@ -288,7 +295,7 @@ export default function TechnicianDetailsPage() {
         } else if (data.emailSent) {
           toast.success("Login credentials sent to technician's email successfully");
         } else {
-          toast.error("Password reset successfully but failed to send email");
+          toast.success("Password reset successfully");
         }
       } else {
         throw new Error(data.message || "Failed to resend password");

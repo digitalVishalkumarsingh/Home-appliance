@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -109,12 +109,12 @@ export async function GET(request: Request) {
     bookings.forEach((booking: any) => {
       const date = new Date(booking.createdAt);
       const monthYear = `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`;
-      
+
       if (!bookingsByMonth[monthYear]) {
         bookingsByMonth[monthYear] = 0;
       }
       bookingsByMonth[monthYear]++;
-      
+
       if (!revenueByMonth[monthYear]) {
         revenueByMonth[monthYear] = 0;
       }

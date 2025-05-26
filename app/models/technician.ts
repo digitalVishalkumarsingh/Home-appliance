@@ -43,15 +43,15 @@ export interface Technician {
   accountCreated?: boolean; // Flag to track if user account has been created
 }
 
-// Default availability template
+// Default availability template - 24/7 service
 export const defaultAvailability = {
-  monday: { available: true, hours: "9:00 AM - 6:00 PM" },
-  tuesday: { available: true, hours: "9:00 AM - 6:00 PM" },
-  wednesday: { available: true, hours: "9:00 AM - 6:00 PM" },
-  thursday: { available: true, hours: "9:00 AM - 6:00 PM" },
-  friday: { available: true, hours: "9:00 AM - 6:00 PM" },
-  saturday: { available: true, hours: "9:00 AM - 6:00 PM" },
-  sunday: { available: false, hours: "" },
+  monday: { available: true, hours: "00:00 - 23:59" },
+  tuesday: { available: true, hours: "00:00 - 23:59" },
+  wednesday: { available: true, hours: "00:00 - 23:59" },
+  thursday: { available: true, hours: "00:00 - 23:59" },
+  friday: { available: true, hours: "00:00 - 23:59" },
+  saturday: { available: true, hours: "00:00 - 23:59" },
+  sunday: { available: true, hours: "00:00 - 23:59" },
 };
 
 // Create a new technician object with default values

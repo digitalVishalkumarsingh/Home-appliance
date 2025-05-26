@@ -1,51 +1,23 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { toast } from 'react-hot-toast';
-import { FaUserCircle, FaCog, FaSignOutAlt } from 'react-icons/fa';
+import { FaUserCircle, FaCog, FaSignOutAlt, FaBars } from 'react-icons/fa';
 import AdminNotificationBadge from './AdminNotificationBadge';
 
 interface AdminHeaderProps {
-  userName?: string;
+  user?: any;
+  onMenuClick?: () => void;
+  onLogout?: () => void;
 }
 
-const AdminHeader: React.FC<AdminHeaderProps> = ({ userName = 'Admin' }) => {
+const AdminHeader: React.FC<AdminHeaderProps> = ({ user, onMenuClick, onLogout }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
-
-  useEffect(() => {
-    // Get user data from localStorage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
-    }
-  }, []);
 
   const handleLogout = () => {
-    // For testing purposes, we'll create a temporary admin user instead of logging out
-    const tempAdminUser = {
-      name: "Admin User",
-      email: "admin@example.com",
-      role: "admin"
-    };
-
-    // Store in localStorage
-    localStorage.setItem("user", JSON.stringify(tempAdminUser));
-    localStorage.setItem("token", "temp-admin-token-for-testing");
-
-    // Set user state
-    setUser(tempAdminUser);
-
-    // Show notification
-    toast.success("Using temporary admin account");
-
-    // Close dropdown
+    if (onLogout) {
+      onLogout();
+    }
     setIsDropdownOpen(false);
   };
 
@@ -54,18 +26,22 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ userName = 'Admin' }) => {
   };
 
   return (
-    <header className="bg-white shadow-md">
+    <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center">
-            <Link href="/admin/dashboard" className="flex-shrink-0 flex items-center">
-              <img
-                className="h-10 w-auto"
-                src="/Dizit-Solution.webp"
-                alt="Dizit Solutions"
-              />
-              <span className="ml-2 text-xl font-bold text-gray-800"></span>
-            </Link>
+          {/* Mobile menu button */}
+          <div className="flex items-center lg:hidden">
+            <button
+              onClick={onMenuClick}
+              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+            >
+              <FaBars className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Logo - hidden on mobile since it's in sidebar */}
+          <div className="hidden lg:flex items-center">
+            <h1 className="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
           </div>
 
           <div className="flex items-center space-x-4">
@@ -75,40 +51,40 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ userName = 'Admin' }) => {
             {/* User dropdown */}
             <div className="relative">
               <button
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 focus:outline-none"
+                className="flex items-center space-x-3 p-2 rounded-lg text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                 onClick={toggleDropdown}
               >
-                <FaUserCircle className="h-8 w-8" />
-                <span className="text-sm font-medium">{user?.name || userName}</span>
+                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                  <FaUserCircle className="h-5 w-5 text-gray-600" />
+                </div>
+                <span className="text-sm font-medium hidden sm:block">{user?.name || user?.email || 'Admin'}</span>
               </button>
 
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 ring-1 ring-black ring-opacity-5">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50 ring-1 ring-gray-200 border border-gray-200">
                   <Link
                     href="/admin/profile"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     onClick={() => setIsDropdownOpen(false)}
                   >
+                    <FaUserCircle className="mr-3 h-4 w-4 text-gray-400" />
                     Your Profile
                   </Link>
                   <Link
                     href="/admin/settings"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     onClick={() => setIsDropdownOpen(false)}
                   >
-                    <div className="flex items-center">
-                      <FaCog className="mr-2" />
-                      Settings
-                    </div>
+                    <FaCog className="mr-3 h-4 w-4 text-gray-400" />
+                    Settings
                   </Link>
+                  <hr className="my-1 border-gray-200" />
                   <button
                     onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                   >
-                    <div className="flex items-center">
-                      <FaSignOutAlt className="mr-2" />
-                      Sign out
-                    </div>
+                    <FaSignOutAlt className="mr-3 h-4 w-4" />
+                    Sign out
                   </button>
                 </div>
               )}

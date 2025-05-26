@@ -4,8 +4,20 @@ import { verifyToken, getTokenFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
 import { Technician, createTechnician } from "@/app/models/technician";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { generateRandomPassword } from "@/app/utils/passwordGenerator";
-import { sendTechnicianCredentialsEmail } from "@/app/lib/email";
+// Import email function with fallback
+let sendTechnicianCredentialsEmail: any;
+try {
+  const emailModule = require("@/app/lib/email");
+  sendTechnicianCredentialsEmail = emailModule.sendTechnicianCredentialsEmail;
+} catch (emailImportError) {
+  console.error("Failed to import email module:", emailImportError);
+  sendTechnicianCredentialsEmail = async () => {
+    console.log("Email module not available, skipping email sending");
+    return false;
+  };
+}
 
 // Get all technicians
 export async function GET(request: Request) {
@@ -20,7 +32,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -95,30 +107,74 @@ export async function GET(request: Request) {
 // Create a new technician
 export async function POST(request: Request) {
   try {
-    // Verify admin authentication
-    const token = getTokenFromRequest(request);
+    console.log("POST /api/admin/technicians - Starting technician creation");
 
-    if (!token) {
+    // Verify admin authentication
+    let token;
+    try {
+      token = getTokenFromRequest(request);
+      console.log("Token extracted successfully");
+    } catch (tokenError) {
+      console.error("Token extraction failed:", tokenError);
       return NextResponse.json(
-        { success: false, message: "Authentication required" },
+        { success: false, message: "Authentication required", error: "Token extraction failed" },
         { status: 401 }
       );
     }
 
-    const decoded = verifyToken(token);
+    if (!token) {
+      console.log("No token provided");
+      return NextResponse.json(
+        { success: false, message: "Authentication required", error: "No token provided" },
+        { status: 401 }
+      );
+    }
+
+    let decoded;
+    try {
+      decoded = await verifyToken(token);
+      console.log("Token verified successfully for user:", decoded.userId);
+    } catch (verifyError) {
+      console.error("Token verification failed:", verifyError);
+      return NextResponse.json(
+        { success: false, message: "Invalid token", error: "Token verification failed" },
+        { status: 401 }
+      );
+    }
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
+      console.log("Unauthorized access attempt. User role:", (decoded as {role?: string})?.role);
       return NextResponse.json(
-        { success: false, message: "Unauthorized access" },
+        { success: false, message: "Unauthorized access", error: "Admin role required" },
         { status: 403 }
       );
     }
 
     // Get technician data from request body
-    const technicianData = await request.json();
+    let technicianData;
+    try {
+      technicianData = await request.json();
+      console.log("Request body parsed successfully. Technician data:", {
+        name: technicianData.name,
+        email: technicianData.email,
+        phone: technicianData.phone,
+        specializations: technicianData.specializations?.length || 0
+      });
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError);
+      return NextResponse.json(
+        { success: false, message: "Invalid request body", error: "JSON parsing failed" },
+        { status: 400 }
+      );
+    }
 
     // Validate required fields
     if (!technicianData.name || !technicianData.email || !technicianData.phone) {
+      console.log("Validation failed. Missing required fields:", {
+        hasName: !!technicianData.name,
+        hasEmail: !!technicianData.email,
+        hasPhone: !!technicianData.phone
+      });
       return NextResponse.json(
         { success: false, message: "Name, email, and phone are required" },
         { status: 400 }
@@ -126,7 +182,18 @@ export async function POST(request: Request) {
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    let db;
+    try {
+      const connection = await connectToDatabase();
+      db = connection.db;
+      console.log("Database connection successful");
+    } catch (dbError) {
+      console.error("Database connection failed:", dbError);
+      return NextResponse.json(
+        { success: false, message: "Database connection failed", error: dbError instanceof Error ? dbError.message : "Unknown database error" },
+        { status: 500 }
+      );
+    }
 
     // Check if technician with same email or phone already exists
     const existingTechnician = await db.collection("technicians").findOne({
@@ -184,55 +251,117 @@ export async function POST(request: Request) {
     // Insert technician into database
     const result = await db.collection("technicians").insertOne(newTechnician);
 
-    // Send email with login credentials to technician
+    // Generate reset token for password setup
+    let resetToken;
     let emailSent = false;
+
     try {
-      console.log("Attempting to send credentials email for new technician:", technicianData.email);
+      console.log("Generating reset token for new technician:", technicianData.email);
 
-      emailSent = await sendTechnicianCredentialsEmail({
-        name: technicianData.name,
-        email: technicianData.email,
-        password: password, // Send the unhashed password
-        phone: technicianData.phone
-      });
+      // Check if JWT_SECRET is configured, use fallback if missing
+      const jwtSecret = process.env.JWT_SECRET || "fallback-secret-for-development-only";
+      if (!process.env.JWT_SECRET) {
+        console.warn("JWT_SECRET not configured, using fallback (not secure for production)");
+      }
 
-      console.log("Email sending result:", emailSent);
+      // Create a reset token for the technician to set their password
+      resetToken = jwt.sign(
+        {
+          userId: result.insertedId.toString(),
+          email: technicianData.email,
+          type: "password-setup"
+        },
+        jwtSecret,
+        { expiresIn: "24h" } // Give them 24 hours to set password
+      );
+
+      console.log("Reset token generated successfully");
+
+      // Check if email configuration is available
+      const emailConfigured = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.ADMIN_EMAIL);
+
+      if (!emailConfigured) {
+        console.log("Email configuration missing, skipping email sending");
+        console.log("To enable email sending, set EMAIL_USER, EMAIL_PASS, and ADMIN_EMAIL environment variables");
+        emailSent = false;
+      } else {
+        // Send email with login credentials to technician
+        console.log("Attempting to send credentials email for new technician:", technicianData.email);
+
+        try {
+          emailSent = await sendTechnicianCredentialsEmail({
+            name: technicianData.name,
+            email: technicianData.email,
+            resetToken: resetToken,
+            phone: technicianData.phone
+          });
+
+          console.log("Email sending result:", emailSent);
+        } catch (emailSendError) {
+          console.error("Failed to send email:", emailSendError);
+          console.error("Email error details:", emailSendError instanceof Error ? emailSendError.message : "Unknown error");
+          emailSent = false;
+        }
+      }
     } catch (emailError) {
-      console.error("Error sending technician credentials email:", emailError);
+      console.error("Error with email/token generation:", emailError);
       console.error("Error details:", {
         error: emailError instanceof Error ? emailError.message : "Unknown error",
         stack: emailError instanceof Error ? emailError.stack : undefined,
-        email: technicianData.email
+        email: technicianData.email,
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        hasEmailConfig: !!(process.env.EMAIL_USER && process.env.EMAIL_PASS)
       });
       // Continue even if email fails
     }
 
-    // Store the password temporarily for display in the response
-    // This is for debugging purposes and should be removed in production
-    const tempPassword = password;
+    const emailConfigured = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.ADMIN_EMAIL);
 
     return NextResponse.json({
       success: true,
-      message: "Technician created successfully" + (emailSent ? " and login credentials sent via email" : ""),
+      message: emailSent
+        ? "Technician created successfully and password setup email sent"
+        : emailConfigured
+          ? "Technician created successfully but email sending failed"
+          : "Technician created successfully (email not configured)",
       technician: {
         _id: result.insertedId,
-        ...newTechnician
+        ...newTechnician,
+        // Remove password from response
+        password: undefined
       },
       emailSent,
-      // Include the password in the response for debugging
-      // This should be removed in production
+      resetTokenGenerated: !!resetToken,
+      emailConfigured,
       debug: {
-        password: tempPassword,
         emailConfig: {
           user: process.env.EMAIL_USER ? "configured" : "missing",
-          pass: process.env.EMAIL_PASS ? "configured" : "missing"
-        }
+          pass: process.env.EMAIL_PASS ? "configured" : "missing",
+          admin: process.env.ADMIN_EMAIL ? "configured" : "missing"
+        },
+        jwtSecret: process.env.JWT_SECRET ? "configured" : "missing",
+        resetToken: resetToken ? "generated" : "failed"
+      },
+      instructions: emailConfigured ? undefined : {
+        message: "To enable email sending, configure these environment variables:",
+        required: ["EMAIL_USER", "EMAIL_PASS", "ADMIN_EMAIL"],
+        testEndpoint: "/api/test/email"
       }
     });
   } catch (error) {
-    console.error("Error creating technician:", error);
+    console.error("Unexpected error creating technician:", error);
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+
     return NextResponse.json(
-      { success: false, message: "Failed to create technician" },
+      {
+        success: false,
+        message: "Failed to create technician",
+        error: error instanceof Error ? error.message : "Unknown error",
+        debug: {
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          timestamp: new Date().toISOString()
+        }
+      },
       { status: 500 }
     );
   }

@@ -38,7 +38,7 @@ const descriptionTexts: string[] = [
 ];
 
 const featureCards: FeatureCard[] = [
-  { icon: <FaClock />, title: "On Time Services", desc: "Punctual service with minimal wait time.", bg: "bg-yellow-400" },
+  { icon: <FaClock />, title: "24/7 Service Available", desc: "Round-the-clock service, 7 days a week.", bg: "bg-yellow-400" },
   { icon: <FaRegUser />, title: "Trained Professionals", desc: "Certified technicians for all repairs.", bg: "bg-blue-400", text: "text-white" },
   { icon: <FaShieldAlt />, title: "Assured Quality", desc: "High-standard servicing, guaranteed.", bg: "bg-green-400" },
   { icon: <FaDollarSign />, title: "No Extra Charges", desc: "Transparent pricing with no hidden fees.", bg: "bg-red-400" },

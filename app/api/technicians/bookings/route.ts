@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || typeof decoded !== "object" || !("userId" in decoded)) {
       return NextResponse.json(

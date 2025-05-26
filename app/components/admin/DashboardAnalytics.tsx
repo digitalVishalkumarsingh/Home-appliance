@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { FaSpinner, FaChartBar, FaRupeeSign, FaUsers, FaCheckCircle } from "react-icons/fa";
-import { toast } from "react-hot-toast";
+// import { toast } from "react-hot-toast"; // Removed unused import
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 
@@ -59,9 +59,8 @@ export default function DashboardAnalytics() {
       const url = `/api/admin/reports?startDate=${startDate}&endDate=${endDate}`;
 
       const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        method: 'GET',
+        credentials: 'include', // Include cookies in the request
       });
 
       if (!response.ok) {

@@ -19,7 +19,7 @@ export async function GET(
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -92,7 +92,7 @@ export async function PATCH(
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -168,7 +168,7 @@ export async function DELETE(
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -190,9 +190,9 @@ export async function DELETE(
 
     if (assignedBookings > 0) {
       return NextResponse.json(
-        { 
-          success: false, 
-          message: "Cannot delete technician with assigned bookings. Please reassign bookings first." 
+        {
+          success: false,
+          message: "Cannot delete technician with assigned bookings. Please reassign bookings first."
         },
         { status: 400 }
       );

@@ -21,6 +21,9 @@ import {
 } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
+import JobNotificationRinger from "@/app/components/JobNotificationRinger";
+import JobNotificationAlert from "@/app/components/technician/JobNotificationAlert";
+import SimpleAvailabilityToggle from "@/app/components/technician/SimpleAvailabilityToggle";
 
 // Define Job interface
 interface Job {
@@ -102,6 +105,7 @@ export default function TechnicianDashboard() {
   });
   const [timeRange, setTimeRange] = useState<"week" | "month" | "year">("month");
   const [commissionRate, setCommissionRate] = useState<number>(30);
+  const [isAvailable, setIsAvailable] = useState(true);
 
   // Helper function to safely access localStorage
   const getToken = () => {
@@ -132,27 +136,31 @@ export default function TechnicianDashboard() {
     return response;
   };
 
-  // Fetch commission rate
+  // Fetch commission rate with fallback
   const fetchCommissionRate = async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-      const response = await fetchWithTimeout(`${API_URL}/api/admin/settings/commission`, {});
+      const response = await fetchWithTimeout(`/api/admin/settings/commission`, {});
       if (!response.ok) {
-        throw new Error(`Failed to fetch commission rate: ${response.status}`);
+        console.log(`Commission rate API returned ${response.status}, using default`);
+        setCommissionRate(30); // Default fallback
+        return;
       }
       const data: ApiResponse = await response.json();
       if (data.success && data.commissionRate) {
         setCommissionRate(data.commissionRate);
+        console.log("Commission rate fetched:", data.commissionRate);
       } else {
-        throw new Error(data.message || "Invalid commission rate response");
+        console.log("Invalid commission rate response, using default");
+        setCommissionRate(30); // Default fallback
       }
     } catch (error) {
-      console.error("Error fetching commission rate:", error);
-      toast.error("Failed to fetch commission rate.");
+      console.log("Commission rate fetch failed, using default 30%");
+      setCommissionRate(30); // Default fallback
+      // Don't show error toast for commission rate - it's not critical
     }
   };
 
-  // Fetch technician stats
+  // Fetch technician stats with fallback
   const fetchTechnicianStats = async () => {
     try {
       setLoading(true);
@@ -160,13 +168,34 @@ export default function TechnicianDashboard() {
       if (!token) {
         throw new Error("Authentication token not found");
       }
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-      const response = await fetchWithTimeout(`${API_URL}/api/technicians/stats?timeRange=${timeRange}`, {
-        headers: { Authorization: `Bearer ${token}` },
+
+      // Try main endpoint first
+      let response = await fetchWithTimeout(`/api/technicians/stats?timeRange=${timeRange}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
       });
+
+      // If main endpoint fails, try simple fallback
+      if (!response.ok) {
+        console.log("Main stats endpoint failed, trying fallback...");
+        response = await fetchWithTimeout(`/api/technicians/stats/simple?timeRange=${timeRange}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
+      }
+
       if (!response.ok) {
         throw new Error(`Failed to fetch stats: ${response.status}`);
       }
+
       const data: ApiResponse = await response.json();
       if (data.success) {
         setStats({
@@ -181,18 +210,38 @@ export default function TechnicianDashboard() {
           bookingsChange: data.bookingsChange || 0,
           earningsChange: data.earningsChange || 0,
         });
+
+        // Show message if using fallback data
+        if (data.fallback) {
+          console.log("Using fallback stats data");
+          toast.success("Dashboard loaded with demo data");
+        }
       } else {
         throw new Error(data.message || "Failed to fetch technician stats");
       }
     } catch (error) {
       console.error("Error fetching technician stats:", error);
       toast.error("Failed to fetch stats. Please try again.");
+
+      // Set default stats if everything fails
+      setStats({
+        totalBookings: 0,
+        completedBookings: 0,
+        pendingBookings: 0,
+        totalEarnings: 0,
+        pendingEarnings: 0,
+        lastPayoutDate: null,
+        lastPayoutAmount: 0,
+        rating: 0,
+        bookingsChange: 0,
+        earningsChange: 0,
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Refresh job history with retry logic
+  // Refresh job history with retry logic and fallback
   const refreshJobHistory = async (retries = 3, delay = 1000): Promise<void> => {
     try {
       setJobHistoryLoading(true);
@@ -201,16 +250,43 @@ export default function TechnicianDashboard() {
       if (!token) {
         throw new Error("Authentication token not found");
       }
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-      let response = await fetchWithTimeout(`${API_URL}/api/technicians/jobs/history?limit=10`, {
-        headers: { Authorization: `Bearer ${token}` },
+
+      // Try main job history endpoint first
+      let response = await fetchWithTimeout(`/api/technicians/jobs/history?limit=10`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
       });
+
+      // If main endpoint fails, try bookings API
       if (!response.ok) {
-        console.log("Trying to fetch from bookings API...");
-        response = await fetchWithTimeout(`${API_URL}/api/bookings?limit=10`, {
-          headers: { Authorization: `Bearer ${token}` },
+        console.log("Main job history endpoint failed, trying bookings API...");
+        response = await fetchWithTimeout(`/api/bookings?limit=10`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
         });
       }
+
+      // If bookings API also fails, try simple fallback
+      if (!response.ok) {
+        console.log("Bookings API failed, trying simple fallback...");
+        response = await fetchWithTimeout(`/api/technicians/jobs/history/simple?limit=10`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
+      }
+
       if (!response.ok) {
         throw new Error(`Failed to fetch job history: ${response.status}`);
       }
@@ -251,6 +327,44 @@ export default function TechnicianDashboard() {
           };
         });
         setJobHistory(formattedJobs);
+
+        // Show message if using fallback data
+        if (data.fallback) {
+          console.log("Using fallback job history data");
+          toast.success("Job history loaded with demo data");
+        }
+      } else if (data.success && Array.isArray(data.jobs)) {
+        // Handle simple fallback format
+        const formattedJobs: Job[] = data.jobs.map((job: any) => ({
+          id: job._id || job.id || `job-${Math.random().toString(36).slice(2, 11)}`,
+          bookingId: job.bookingId || job._id || "Unknown",
+          appliance: job.serviceName || job.appliance || "Service",
+          location: {
+            address: job.address || "Customer Address",
+            distance: 2.5,
+            coordinates: job.location,
+          },
+          earnings: {
+            total: job.amount || job.finalAmount || 0,
+            technicianEarnings: Math.round((job.amount || job.finalAmount || 0) * 0.7),
+            adminCommission: Math.round((job.amount || job.finalAmount || 0) * 0.3),
+            adminCommissionPercentage: 30,
+          },
+          customer: {
+            name: job.customerName || "Customer",
+            phone: job.customerPhone || "",
+          },
+          description: job.notes || job.description || "No description provided",
+          urgency: job.urgency || "normal",
+          status: job.status || "completed",
+          createdAt: job.createdAt || new Date().toISOString(),
+        }));
+        setJobHistory(formattedJobs);
+
+        if (data.fallback) {
+          console.log("Using simple fallback job history data");
+          toast.success("Job history loaded with demo data");
+        }
       } else {
         throw new Error(data.message || "Invalid job history response");
       }
@@ -274,10 +388,9 @@ export default function TechnicianDashboard() {
       if (!token) {
         throw new Error("Authentication token not found");
       }
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-      const response = await fetchWithTimeout(`${API_URL}/api/technicians/jobs/create-test-offer`, {
+      const response = await fetchWithTimeout(`/api/technicians/jobs/create-test-offer`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include', // Include cookies in the request
       });
       if (!response.ok) {
         throw new Error(`Failed to create test job offer: ${response.status}`);
@@ -328,32 +441,133 @@ export default function TechnicianDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent">Technician Dashboard</h1>
-        <p className="mt-2 text-sm text-gray-600">Monitor your bookings, earnings, and performance metrics</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Job Notification Systems */}
+      <JobNotificationRinger />
+      <JobNotificationAlert
+        isAvailable={isAvailable}
+        onJobAccept={async (jobId) => {
+          console.log("Job accepted:", jobId);
+          toast.success("Job accepted! Check your active jobs.");
+        }}
+        onJobReject={async (jobId) => {
+          console.log("Job rejected:", jobId);
+          toast.info("Job declined.");
+        }}
+      />
+
+      <div className="space-y-6">
+
+      {/* Dashboard Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Dashboard Overview</h1>
+            <p className="mt-1 text-sm text-gray-600">Monitor your bookings, earnings, and performance metrics</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-600">Welcome back!</p>
+            <p className="text-lg font-medium text-gray-900">Ready to work</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <FaCalendarCheck className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Bookings</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.totalBookings}</p>
+              {stats.bookingsChange !== 0 && (
+                <p className={`text-sm flex items-center ${stats.bookingsChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats.bookingsChange > 0 ? <FaArrowUp className="w-3 h-3 mr-1" /> : <FaArrowDown className="w-3 h-3 mr-1" />}
+                  {Math.abs(stats.bookingsChange)}% from last period
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <FaRupeeSign className="w-5 h-5 text-green-600" />
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Earnings</p>
+              <p className="text-2xl font-semibold text-gray-900">₹{stats.totalEarnings.toLocaleString()}</p>
+              {stats.earningsChange !== 0 && (
+                <p className={`text-sm flex items-center ${stats.earningsChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats.earningsChange > 0 ? <FaArrowUp className="w-3 h-3 mr-1" /> : <FaArrowDown className="w-3 h-3 mr-1" />}
+                  {Math.abs(stats.earningsChange)}% from last period
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <FaStar className="w-5 h-5 text-yellow-600" />
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Rating</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.rating.toFixed(1)}</p>
+              <p className="text-sm text-gray-500">out of 5.0</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                <FaSpinner className="w-5 h-5 text-orange-600" />
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Pending Earnings</p>
+              <p className="text-2xl font-semibold text-gray-900">₹{stats.pendingEarnings.toLocaleString()}</p>
+              <p className="text-sm text-gray-500">awaiting payout</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Time Range Filter */}
-      <div className="bg-white shadow rounded-lg p-6 mb-6">
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-medium text-gray-900 mb-4 sm:mb-0">Performance Overview</h2>
+          <div className="mb-4 sm:mb-0">
+            <h2 className="text-lg font-medium text-gray-900">Performance Overview</h2>
+            <p className="text-sm text-gray-600">Track your earnings and bookings over time</p>
+          </div>
           <div className="flex space-x-2">
             <button
               onClick={() => setTimeRange("week")}
-              className={`px-4 py-2 text-sm font-medium rounded-md ${timeRange === "week" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              className={`px-3 py-2 text-sm font-medium rounded ${timeRange === "week" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
             >
               This Week
             </button>
             <button
               onClick={() => setTimeRange("month")}
-              className={`px-4 py-2 text-sm font-medium rounded-md ${timeRange === "month" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              className={`px-3 py-2 text-sm font-medium rounded ${timeRange === "month" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
             >
               This Month
             </button>
             <button
               onClick={() => setTimeRange("year")}
-              className={`px-4 py-2 text-sm font-medium rounded-md ${timeRange === "year" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              className={`px-3 py-2 text-sm font-medium rounded ${timeRange === "year" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
             >
               This Year
             </button>
@@ -522,7 +736,7 @@ export default function TechnicianDashboard() {
           </div>
         )}
       </div>
+      </div>
     </div>
-  
-);
+  );
 }

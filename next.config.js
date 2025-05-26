@@ -36,8 +36,8 @@ const nextConfig = {
   // Add powered by header
   poweredByHeader: false,
 
-  // Configure output mode for better performance
-  output: 'standalone',
+  // Configure output mode for Vercel deployment
+  output: process.env.NODE_ENV === 'production' ? undefined : 'standalone',
 };
 
 module.exports = nextConfig;

@@ -16,7 +16,7 @@ if (!MONGODB_URI || !MONGODB_DB) {
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
 
-export async function connectToDatabase(p0: { timeoutMs: number; }): Promise<{ client: MongoClient; db: Db }> {
+export async function connectToDatabase(_options?: { timeoutMs: number; }): Promise<{ client: MongoClient; db: Db }> {
   try {
     // Check for cached connection first
     if (cachedClient && cachedDb) {

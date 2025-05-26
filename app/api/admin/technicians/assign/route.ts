@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     }
 
     // Check if technician has the required specialization
-    if (!technician.specializations.some(spec => 
+    if (!technician.specializations.some(spec =>
       booking.service?.toLowerCase().includes(spec.toLowerCase())
     )) {
       return NextResponse.json(
@@ -88,14 +88,14 @@ export async function POST(request: Request) {
     // Update booking with technician assignment
     await db.collection("bookings").updateOne(
       { _id: booking._id },
-      { 
-        $set: { 
+      {
+        $set: {
           technician: technician.name,
           technicianId: technician._id.toString(),
           status: "assigned",
           assignedAt: new Date(),
           updatedAt: new Date()
-        } 
+        }
       }
     );
 
@@ -144,7 +144,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyToken(token);
 
     if (!decoded || (decoded as {role?: string}).role !== "admin") {
       return NextResponse.json(

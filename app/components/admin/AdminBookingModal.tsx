@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { FaTimes, FaCheck, FaSpinner, FaPrint, FaUser, FaCalendarAlt, FaRupeeSign, FaUserCog } from 'react-icons/fa';
-import { toast } from 'react-hot-toast';
+import { toast } from '../ui/Toast'; // Fixed import to use local Toast component
 import TechnicianAssignmentModal from './TechnicianAssignmentModal';
 
 interface Booking {
@@ -244,8 +244,8 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
         });
       };
 
-      // Write the HTML content
-      printWindow.document.write(`
+      // Create HTML content as a string
+      const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -443,8 +443,11 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
           </div>
         </body>
         </html>
-      `);
+      `;
 
+      // Write to the document using a safer approach
+      printWindow.document.open();
+      printWindow.document.write(htmlContent);
       printWindow.document.close();
 
       // Trigger print after a short delay to ensure content is loaded
@@ -803,3 +806,4 @@ export default function AdminBookingModal({ bookingId, isOpen, onClose, onStatus
     </div>
   );
 }
+

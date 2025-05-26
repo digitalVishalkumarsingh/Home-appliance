@@ -9,13 +9,13 @@ import {
   FaEnvelope,
   FaPhone,
   FaMapMarkerAlt,
-  
+
   FaSave,
 
   FaExclamationTriangle,
- 
+
 } from "react-icons/fa";
-import AvailabilityToggle from "@/app/components/technician/AvailabilityToggle";
+// Removed AvailabilityToggle - now only in dashboard
 
 interface TechnicianSettings {
   name: string;
@@ -242,11 +242,13 @@ export default function TechnicianSettings() {
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">Availability Settings</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Control your availability for new job offers
+            Control your availability for new job offers from the dashboard
           </p>
-          
-          <div className="mt-4">
-            <AvailabilityToggle />
+
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              💡 <strong>Tip:</strong> Use the duty toggle button on your dashboard to control your availability for new jobs.
+            </p>
           </div>
         </div>
 
@@ -255,7 +257,7 @@ export default function TechnicianSettings() {
           <p className="mt-1 text-sm text-gray-500">
             Update your personal and contact information
           </p>
-          
+
           <div className="mt-4 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-4">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
@@ -276,7 +278,7 @@ export default function TechnicianSettings() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email Address
@@ -296,7 +298,7 @@ export default function TechnicianSettings() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
                 Phone Number
@@ -316,7 +318,7 @@ export default function TechnicianSettings() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="serviceRadius" className="block text-sm font-medium text-gray-700">
                 Service Radius (km)
@@ -336,7 +338,7 @@ export default function TechnicianSettings() {
                 Maximum distance you're willing to travel for service calls
               </p>
             </div>
-            
+
             <div className="sm:col-span-2">
               <label htmlFor="address" className="block text-sm font-medium text-gray-700">
                 Address
@@ -363,7 +365,7 @@ export default function TechnicianSettings() {
           <p className="mt-1 text-sm text-gray-500">
             Select the services you can provide
           </p>
-          
+
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {availableSpecializations.map((specialization) => (
               <div key={specialization} className="relative flex items-start">
@@ -391,7 +393,7 @@ export default function TechnicianSettings() {
           <p className="mt-1 text-sm text-gray-500">
             Choose how you want to receive notifications
           </p>
-          
+
           <div className="mt-4 space-y-4">
             <div className="relative flex items-start">
               <div className="flex items-center h-5">
@@ -414,7 +416,7 @@ export default function TechnicianSettings() {
                 <p className="text-gray-500">Get notified about new job offers via email</p>
               </div>
             </div>
-            
+
             <div className="relative flex items-start">
               <div className="flex items-center h-5">
                 <input
@@ -436,7 +438,7 @@ export default function TechnicianSettings() {
                 <p className="text-gray-500">Receive text messages for urgent job offers</p>
               </div>
             </div>
-            
+
             <div className="relative flex items-start">
               <div className="flex items-center h-5">
                 <input
